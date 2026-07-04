@@ -77,9 +77,9 @@ const createSchema = z
     email: z.string().optional(),
     phone: z.string().optional(),
     whatsapp: z.string().optional(),
-    birthDate: z.string().optional(),
+    birthDate: z.string().nullish(),
     status: z.enum(['active', 'inactive']).optional(),
-    photo: z.string().optional(),
+    photo: z.string().nullish(),
     profile: z.any().optional(),
   })
   .passthrough();
