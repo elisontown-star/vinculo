@@ -1,0 +1,37 @@
+{
+  // Configuração do Worker da API do Vínculo.
+  // Os IDs <PREENCHER> são gerados quando você cria os recursos (veja o README).
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "vinculo-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-07-18",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+
+  "vars": {
+    "APP_ENV": "development",
+    // Origem(ns) permitida(s) no CORS. Em produção, troque pela URL do seu
+    // front-end (ex.: "https://vinculo-web.pages.dev"). Aceita várias separadas por vírgula.
+    "WEB_ORIGIN": "http://localhost:5173"
+  },
+
+  // Banco transacional (1 por ambiente; "1 banco por clínica" evoluímos depois).
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "vinculo",
+      "database_id": "d1d8c058-8ad4-47e1-9444-c48b511761af",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  // Cache (também usado pelo limitador anti-brute-force).
+  "kv_namespaces": [
+    { "binding": "CACHE", "id": "03d32e120047416585c2b224dc47a47c" }
+  ],
+
+
+  // IA (Etapa 2): quando começar o RAG, adicione de volta:
+  //   "vectorize": [{ "binding": "VEC", "index_name": "vinculo-pacientes" }],
+  //   "ai": { "binding": "AI" }
+}
