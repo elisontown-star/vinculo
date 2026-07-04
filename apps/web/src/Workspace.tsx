@@ -4,11 +4,13 @@ import { Brand } from './App';
 import { Controls } from './Controls';
 import { useI18n } from './i18n';
 import { LOCALE } from './locales';
+import DadosCadastraisTab from './tabs/DadosCadastraisTab';
 import ConsultaTab from './tabs/ConsultaTab';
 import FichaTab from './tabs/FichaTab';
 import TimelineTab from './tabs/TimelineTab';
+import AnaLuizaTab from './tabs/AnaLuizaTab';
 
-type Tab = 'consulta' | 'ficha' | 'timeline';
+type Tab = 'dados' | 'consulta' | 'ficha' | 'timeline' | 'ana';
 
 function initials(name: string) {
   return name.trim().split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase() ?? '').join('');
@@ -141,7 +143,7 @@ export default function Workspace({ onLogout }: { onLogout: () => void }) {
 
   function select(id: string) {
     setSelectedId(id);
-    setTab('consulta');
+    setTab('dados');
     setPatient(null);
     loadDetail(id);
     loadSessions(id);
@@ -194,12 +196,17 @@ export default function Workspace({ onLogout }: { onLogout: () => void }) {
             </header>
 
             <nav className="tabs">
+              <button className={tab === 'dados' ? 'on' : ''} onClick={() => setTab('dados')}>{t('tab.dados')}</button>
               <button className={tab === 'consulta' ? 'on' : ''} onClick={() => setTab('consulta')}>{t('tab.consulta')}</button>
               <button className={tab === 'ficha' ? 'on' : ''} onClick={() => setTab('ficha')}>{t('tab.ficha')}</button>
               <button className={tab === 'timeline' ? 'on' : ''} onClick={() => setTab('timeline')}>{t('tab.timeline')}</button>
+              <button className={tab === 'ana' ? 'on' : ''} onClick={() => setTab('ana')}>{t('tab.ana')}</button>
             </nav>
 
             <div className="tab-body">
+              {tab === 'dados' && (
+                <DadosCadastraisTab key={`d-${patient.id}`} patient={patient} onSaved={() => { loadDetail(patient.id); loadPatients(); }} />
+              )}
               {tab === 'consulta' && (
                 <ConsultaTab key={`c-${patient.id}`} patientId={patient.id} sessions={sessions} loadingSessions={loadingSessions} onSaved={() => loadSessions(patient.id)} />
               )}
@@ -208,6 +215,9 @@ export default function Workspace({ onLogout }: { onLogout: () => void }) {
               )}
               {tab === 'timeline' && (
                 <TimelineTab key={`t-${patient.id}`} patientId={patient.id} events={events} loading={loadingEvents} onChanged={() => loadEvents(patient.id)} />
+              )}
+              {tab === 'ana' && (
+                <AnaLuizaTab key={`a-${patient.id}`} patient={patient} sessions={sessions} events={events} />
               )}
             </div>
           </main>

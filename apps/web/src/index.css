@@ -305,3 +305,40 @@ input, textarea, select, button { font-family: inherit; }
 [data-theme='dark'] .pill { color: #7fe0b6; background: rgba(46, 160, 110, 0.15); }
 [data-theme='dark'] .saved-badge { color: #7fe0b6; }
 [data-theme='dark'] .auth-controls .lang-select, [data-theme='dark'] .auth-controls .theme-btn { background: rgba(22, 29, 51, 0.85); }
+
+/* ======================================================================
+   Ana Luiza — leitura integrada do paciente (aba IA)
+   ====================================================================== */
+.ana-tab { max-width: 880px; }
+.ana-hero { display: flex; align-items: center; gap: 14px; padding: 16px 18px; border-radius: var(--radius); background: linear-gradient(135deg, var(--navy) 0%, var(--navy-2) 100%); color: #fff; }
+.ana-avatar { width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; font-family: 'Sora', system-ui, sans-serif; font-weight: 700; font-size: 16px; letter-spacing: 0.03em; color: #fff; background: linear-gradient(135deg, var(--orange) 0%, var(--orange-deep) 100%); flex: none; }
+.ana-hero-txt h3 { font-family: 'Sora', system-ui, sans-serif; font-size: 18px; margin: 0; }
+.ana-hero-txt p { margin: 2px 0 0; font-size: 13px; opacity: 0.85; }
+.ana-disclaimer { font-size: 12.5px; color: var(--muted); background: var(--orange-tint); border-left: 3px solid var(--orange); border-radius: var(--radius-sm); padding: 10px 12px; margin: 14px 0 18px; line-height: 1.5; }
+.ana-empty { border: 1px dashed var(--line); border-radius: var(--radius-sm); padding: 30px 16px; text-align: center; color: var(--muted); font-size: 13.5px; }
+
+.ana-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 18px; }
+.ana-metric { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 14px 10px; text-align: center; }
+.am-value { display: block; font-family: 'Sora', system-ui, sans-serif; font-weight: 700; font-size: 22px; color: var(--navy); }
+.am-label { display: block; font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+.ana-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; margin-bottom: 14px; }
+.ana-card h4 { font-family: 'Sora', system-ui, sans-serif; font-size: 14.5px; font-weight: 600; margin: 0 0 10px; color: var(--navy); }
+.ana-para { font-size: 14px; line-height: 1.6; margin: 0 0 10px; color: var(--ink); }
+.ana-para:last-child { margin-bottom: 0; }
+.ana-last { border-top: 1px solid var(--line-soft); padding-top: 10px; color: var(--muted); }
+
+.ana-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.ana-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding: 6px 12px; border-radius: 999px; background: var(--navy-tint); color: var(--navy); }
+.ana-chip.warn { background: var(--orange-tint); color: var(--orange-deep); }
+.ana-chip-n { font-size: 11px; background: var(--navy); color: #fff; border-radius: 999px; padding: 0 6px; line-height: 1.6; }
+
+.ana-events { list-style: none; margin: 0; padding: 0; }
+.ana-events li { display: flex; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line-soft); font-size: 13.5px; }
+.ana-events li:last-child { border-bottom: 0; }
+.ana-ev-date { color: var(--muted); flex: none; min-width: 96px; }
+.ana-ev-title { color: var(--ink); }
+
+@media (max-width: 620px) {
+  .ana-metrics { grid-template-columns: repeat(2, 1fr); }
+}
