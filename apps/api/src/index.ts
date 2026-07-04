@@ -21,7 +21,7 @@ app.use('*', (c, next) =>
         .filter(Boolean);
       const ok =
         /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin) ||
-        /^https:\/\/[a-z0-9-]+\.pages\.dev$/.test(origin) ||
+        /^https:\/\/([a-z0-9-]+\.)+pages\.dev$/.test(origin) ||
         allowed.includes(origin);
       return ok ? origin : (allowed[0] ?? null);
     },
