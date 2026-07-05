@@ -62,6 +62,8 @@ export const patients = sqliteTable(
     // financeira, saúde, estilo de vida, interesses, personalidade,
     // relacionamentos. Tudo opcional — a IA lê este campo.
     profile: text('profile'),
+    // Exclusão lógica (lixeira): quando preenchido, o paciente está na lixeira.
+    deletedAt: integer('deleted_at', { mode: 'timestamp_ms' }),
     createdAt: createdAt(),
   },
   (t) => ({
