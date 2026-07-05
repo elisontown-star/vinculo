@@ -492,3 +492,66 @@ patientRoutes.delete('/:id/permanent', async (c) => {
   });
   return c.json({ ok: true });
 });
+
+// ---- Chat da Ana Luiza -----------------------------------------------------
+// Conversa com contexto opcional do paciente. Mantém histórico enviado pelo
+// cliente. A IA observa e sugere — nunca diagnostica.
+const chatSchema = z.object({
+  patientId: z.string().optional(),
+  messages: z
+    .array(z.object({ role: z.enum(['user', 'assistant']), content: z.string().min(1).max(4000) }))
+    .min(1)
+    .max(20),
+});
+
+patientRoutes.post('/ana-chat', zValidator('json', chatSchema), async (c) => {
+  const user = c.get('user');
+  const { patientId, messages } = c.req.valid('json');
+
+  let patientContext = '';
+  if (patientId) {
+    const row = await findPatient(c, user, patientId);
+    if (row) {
+      const db = getDb(c.env);
+      const profile = row.profile ? JSON.parse(row.profile) : {};
+      const sessRows = await db
+        .select().from(sessions)
+        .where(eq(sessions.patientId, patientId))
+        .orderBy(desc(sessions.occurredAt))
+        .all();
+      const eventRows = await db
+        .select().from(timelineEvents)
+        .where(eq(timelineEvents.patientId, patientId))
+        .orderBy(asc(timelineEvents.eventDate))
+        .all();
+      patientContext =
+        '\n\nCONTEXTO DO PACIENTE EM ATENDIMENTO (use quando a pergunta for sobre "este paciente"):\n' +
+        buildPatientContext({ fullName: row.fullName, profile }, sessRows.map(serializeSession), eventRows);
+    }
+  }
+
+  const system =
+    'Você é a Ana Luiza, assistente de IA de um psicólogo dentro do sistema Vínculo. ' +
+    'Ajuda com dúvidas gerais de psicologia clínica E, quando há um paciente em ' +
+    'atendimento, comenta sobre ele a partir dos registros. Seja acolhedora, clara e ' +
+    'objetiva. Você observa, resume e sugere — NUNCA dá diagnóstico definitivo nem ' +
+    'substitui o julgamento do profissional. Responda em português do Brasil.' +
+    patientContext;
+
+  let answer = '';
+  try {
+    const res: any = await c.env.AI.run('@cf/meta/llama-3.3-70b-instruct-fp8-fast', {
+      messages: [{ role: 'system', content: system }, ...messages],
+      max_tokens: 800,
+      temperature: 0.7,
+    });
+    answer = (res?.response ?? '').toString().trim();
+  } catch (err) {
+    const msg = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+    console.error('[ana-chat] ERRO:', msg);
+    return c.json({ error: 'ai_failed', detail: msg }, 502);
+  }
+
+  if (!answer) return c.json({ error: 'empty' }, 502);
+  return c.json({ answer });
+});
