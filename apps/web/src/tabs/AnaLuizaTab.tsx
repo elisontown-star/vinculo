@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { type Patient, type Session, type TimelineEvent } from '../lib/api';
+import { useMemo, useState, useEffect } from 'react';
+import { api, type Patient, type Session, type TimelineEvent } from '../lib/api';
 import { useI18n } from '../i18n';
 import { LOCALE } from '../locales';
 
@@ -84,6 +84,32 @@ export default function AnaLuizaTab({
 
   const empty = sessions.length === 0 && !complaint && events.length === 0;
 
+  // Ana Luiza (IA): sugere perguntas para a próxima sessão ao abrir a aba.
+  const [aiQuestions, setAiQuestions] = useState<string[] | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    if (empty) return;
+    setAiLoading(true);
+    setAiError(false);
+    api
+      .aiQuestions(patient.id)
+      .then((r) => {
+        if (alive) setAiQuestions(r.questions ?? []);
+      })
+      .catch(() => {
+        if (alive) setAiError(true);
+      })
+      .finally(() => {
+        if (alive) setAiLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [patient.id, empty]);
+
   return (
     <div className="ana-tab">
       <div className="ana-hero">
@@ -147,6 +173,26 @@ export default function AnaLuizaTab({
                 {last.evolution ? `. ${last.evolution}` : ''}
               </p>
             )}
+          </section>
+
+          {/* Perguntas sugeridas pela IA para a próxima sessão */}
+          <section className="ana-card ana-ai">
+            <h4>
+              <span className="ana-ai-spark">✦</span> {t('ana.aiQuestions')}
+            </h4>
+            {aiLoading && <p className="ana-para ana-ai-loading">{t('ana.aiLoading')}</p>}
+            {aiError && <p className="ana-para ana-ai-err">{t('ana.aiError')}</p>}
+            {!aiLoading && !aiError && aiQuestions && aiQuestions.length === 0 && (
+              <p className="ana-para">{t('ana.aiEmpty')}</p>
+            )}
+            {!aiLoading && !aiError && aiQuestions && aiQuestions.length > 0 && (
+              <ol className="ana-ai-list">
+                {aiQuestions.map((q, i) => (
+                  <li key={i}>{q}</li>
+                ))}
+              </ol>
+            )}
+            <p className="ana-ai-note">{t('ana.aiNote')}</p>
           </section>
 
           {/* Sinalizações */}
