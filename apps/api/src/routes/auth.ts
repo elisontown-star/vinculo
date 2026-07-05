@@ -23,11 +23,20 @@ async function issueToken(env: Env, user: UserRow): Promise<string> {
   );
 }
 
+const strongPassword = z
+  .string()
+  .min(8, 'weak_length')
+  .max(72, 'weak_length')
+  .refine((v) => /[a-z]/.test(v), 'weak_lower')
+  .refine((v) => /[A-Z]/.test(v), 'weak_upper')
+  .refine((v) => /[0-9]/.test(v), 'weak_number')
+  .refine((v) => /[^A-Za-z0-9]/.test(v), 'weak_special');
+
 const registerSchema = z.object({
   clinicName: z.string().min(2),
   name: z.string().min(2),
   email: z.string().email(),
-  password: z.string().min(8),
+  password: strongPassword,
 });
 
 // Cria a clínica (tenant) + o usuário dono. Ponto de entrada de uma nova clínica.
