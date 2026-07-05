@@ -257,6 +257,9 @@ export default function Workspace({ onLogout }: { onLogout: () => void }) {
                   {patient.email || patient.phone || t('hdr.noContact')} · {t('hdr.since')} {fmtDate(patient.createdAt)}
                 </p>
               </div>
+              {patient.profile?.personal?.isChild && (
+                <span className="pill child">🧸 {t('hdr.childCare')}</span>
+              )}
               <span className={`pill ${patient.status}`}>{patient.status === 'active' ? t('status.active') : t('status.inactive')}</span>
               <button className="btn-delete-patient" onClick={() => setConfirmDelete(true)} title={t('patient.delete')}>
                 🗑 {t('patient.delete')}

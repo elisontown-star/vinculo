@@ -530,3 +530,11 @@ input, textarea, select, button { font-family: inherit; }
 .mfa-topbar { display: flex; align-items: center; justify-content: space-between; padding: 20px 28px; border-bottom: 1px solid var(--line); background: var(--surface); }
 .mfa-center { flex: 1; display: grid; place-items: center; padding: 32px 20px; }
 .mfa-center .auth-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 36px 32px; max-width: 420px; }
+
+/* Selo de atendimento infantil + ajuste para dois selos lado a lado */
+.pill.child { color: #7a4ecc; background: rgba(122, 78, 204, 0.12); margin-left: 8px; }
+.ficha-header .pill:not(.child) { margin-left: auto; }
+.ficha-header .pill.child + .pill { margin-left: 8px; }
+
+/* Indicador de busca de CEP */
+.cep-hint { font-size: 12.5px; color: var(--orange-deep); background: var(--orange-tint); padding: 8px 12px; border-radius: var(--radius-sm); margin-bottom: 14px; }
