@@ -312,52 +312,130 @@ function buildPatientContext(patient: any, sess: any[], events: any[]): string {
   const idBits: string[] = [];
   if (age != null) idBits.push(`${age} anos`);
   if (patient.birthDate) idBits.push(`nascido(a) em ${new Date(patient.birthDate).toLocaleDateString('pt-BR')}`);
+  if (patient.socialName) idBits.push(`nome social: ${patient.socialName}`);
   if (pers.sex) idBits.push(`sexo: ${pers.sex}`);
   if (pers.gender) idBits.push(`gênero: ${pers.gender}`);
   if (pers.maritalStatus) idBits.push(`estado civil: ${pers.maritalStatus}`);
   if (pers.profession) idBits.push(`profissão: ${pers.profession}`);
+  if (pers.company) idBits.push(`empresa: ${pers.company}`);
+  if (pers.education) idBits.push(`escolaridade: ${pers.education}`);
   if (pers.city || pers.state) idBits.push(`cidade: ${[pers.city, pers.state].filter(Boolean).join('/')}`);
+  if (patient.email) idBits.push(`e-mail: ${patient.email}`);
+  if (patient.phone) idBits.push(`telefone: ${patient.phone}`);
   if (idBits.length) parts.push(`Dados pessoais: ${idBits.join('; ')}.`);
 
-  if (p.clinical?.complaint) parts.push(`Queixa principal: ${p.clinical.complaint}`);
-  if (p.clinical?.history) parts.push(`Histórico: ${p.clinical.history}`);
-  if (p.clinical?.goals) parts.push(`Objetivos: ${p.clinical.goals}`);
-  if (p.clinical?.suffering) parts.push(`Nível de sofrimento: ${p.clinical.suffering}`);
+  // Quadro clínico
+  const cl = p.clinical ?? {};
+  if (cl.complaint) parts.push(`Queixa principal: ${cl.complaint}`);
+  if (cl.history) parts.push(`Histórico: ${cl.history}`);
+  if (cl.goals) parts.push(`Objetivos do processo: ${cl.goals}`);
+  if (cl.suffering) parts.push(`Nível de sofrimento: ${cl.suffering}`);
+  if (cl.psychiatric) parts.push(`Acompanhamento psiquiátrico: ${cl.psychiatric}`);
+  if (cl.priorDiagnoses) parts.push(`Diagnósticos anteriores: ${cl.priorDiagnoses}`);
+  if (cl.priorTreatments) parts.push(`Tratamentos anteriores: ${cl.priorTreatments}`);
 
+  // Saúde
+  const h = p.health ?? {};
   const flags: string[] = [];
-  if (p.health?.depression) flags.push('indicativo de depressão');
-  if (p.health?.anxiety) flags.push('indicativo de ansiedade');
-  if (p.health?.bipolar) flags.push('indicativo de bipolaridade');
-  if (p.health?.tdah) flags.push('indicativo de TDAH');
-  if (flags.length) parts.push(`Sinalizações da ficha: ${flags.join(', ')}.`);
-  if (p.health?.medications) parts.push(`Medicações: ${p.health.medications}`);
+  if (h.depression) flags.push('depressão');
+  if (h.anxiety) flags.push('ansiedade');
+  if (h.tag) flags.push('TAG');
+  if (h.tdah) flags.push('TDAH');
+  if (h.bipolar) flags.push('bipolaridade');
+  if (flags.length) parts.push(`Sinalizações de saúde marcadas na ficha: ${flags.join(', ')}.`);
+  if (h.medications) parts.push(`Medicações: ${h.medications}`);
+  if (h.diseases) parts.push(`Doenças: ${h.diseases}`);
+  if (h.surgeries) parts.push(`Cirurgias: ${h.surgeries}`);
+  if (h.hospitalizations) parts.push(`Internações: ${h.hospitalizations}`);
+  if (h.familyHistory) parts.push(`Histórico familiar de saúde: ${h.familyHistory}`);
 
-  // Estilo de vida e interesses (resumo)
+  // Estilo de vida
   const life = p.lifestyle ?? {};
   const lifeBits: string[] = [];
-  if (life.sleep) lifeBits.push(`sono: ${life.sleep}`);
-  if (life.alcohol) lifeBits.push(`álcool: ${life.alcohol}`);
-  if (life.religion) lifeBits.push(`religião: ${life.religion}`);
+  for (const [k, label] of [
+    ['sports', 'esportes'], ['gym', 'academia'], ['diet', 'alimentação'], ['sleep', 'sono'],
+    ['alcohol', 'álcool'], ['smoking', 'tabagismo'], ['drugs', 'drogas'],
+    ['religion', 'religião'], ['spirituality', 'espiritualidade'],
+  ] as [string, string][]) {
+    if (life[k]) lifeBits.push(`${label}: ${life[k]}`);
+  }
   if (lifeBits.length) parts.push(`Estilo de vida: ${lifeBits.join('; ')}.`);
-  if (p.interests?.hobbies) parts.push(`Interesses/hobbies: ${p.interests.hobbies}`);
 
-  const recent = sess.slice(0, 4);
-  if (recent.length) {
-    parts.push('Consultas recentes (da mais nova para a mais antiga):');
-    for (const s of recent) {
+  // Interesses
+  const it = p.interests ?? {};
+  const itBits: string[] = [];
+  for (const [k, label] of [
+    ['books', 'livros'], ['movies', 'filmes'], ['music', 'música'], ['games', 'jogos'],
+    ['social', 'redes sociais'], ['tech', 'tecnologia'], ['hobbies', 'hobbies'],
+  ] as [string, string][]) {
+    if (it[k]) itBits.push(`${label}: ${it[k]}`);
+  }
+  if (itBits.length) parts.push(`Interesses: ${itBits.join('; ')}.`);
+
+  // Personalidade
+  const per = p.personality ?? {};
+  const traits: string[] = [];
+  for (const [k, label] of [
+    ['introvert', 'introvertido'], ['extrovert', 'extrovertido'], ['communicative', 'comunicativo'],
+    ['reserved', 'reservado'], ['impulsive', 'impulsivo'], ['organized', 'organizado'], ['creative', 'criativo'],
+  ] as [string, string][]) {
+    if (per[k]) traits.push(label);
+  }
+  if (traits.length) parts.push(`Traços de personalidade: ${traits.join(', ')}.`);
+  if (per.notes) parts.push(`Observações de personalidade: ${per.notes}`);
+
+  // Relacionamentos
+  const rel = p.relationships ?? {};
+  const relBits: string[] = [];
+  if (rel.family) relBits.push(`família: ${rel.family}`);
+  if (rel.friends) relBits.push(`amigos: ${rel.friends}`);
+  if (rel.work) relBits.push(`trabalho: ${rel.work}`);
+  if (rel.romantic) relBits.push(`vida amorosa: ${rel.romantic}`);
+  if (relBits.length) parts.push(`Relacionamentos: ${relBits.join('; ')}.`);
+
+  // Situação financeira
+  const fin = p.financial ?? {};
+  const finBits: string[] = [];
+  if (fin.situation) finBits.push(`situação: ${fin.situation}`);
+  if (fin.debt) finBits.push(`endividamento: ${fin.debt}`);
+  if (fin.work) finBits.push(`vínculo de trabalho: ${fin.work}`);
+  if (fin.income) finBits.push(`renda: ${fin.income}`);
+  if (finBits.length) parts.push(`Situação financeira: ${finBits.join('; ')}.`);
+
+  // Família
+  const fam = p.family ?? {};
+  const famBits: string[] = [];
+  if (fam.father?.name) famBits.push(`pai: ${fam.father.name}${fam.father.alive ? ` (vivo: ${fam.father.alive})` : ''}`);
+  if (fam.mother?.name) famBits.push(`mãe: ${fam.mother.name}${fam.mother.alive ? ` (viva: ${fam.mother.alive})` : ''}`);
+  if (fam.siblings) famBits.push(`irmãos: ${fam.siblings}`);
+  if (fam.children) famBits.push(`filhos: ${fam.children}`);
+  if (fam.spouse) famBits.push(`cônjuge/parceiro: ${fam.spouse}`);
+  if (famBits.length) parts.push(`Família: ${famBits.join('; ')}.`);
+
+  // Consultas (todas)
+  if (sess.length) {
+    parts.push(`Consultas registradas (${sess.length}, da mais nova para a mais antiga):`);
+    for (const s of sess) {
       const bits: string[] = [];
+      if (s.occurredAt) bits.push(new Date(s.occurredAt).toLocaleDateString('pt-BR'));
       if (s.mood) bits.push(`humor: ${s.mood}`);
-      if (typeof s.emotionalScale === 'number') bits.push(`escala emocional: ${s.emotionalScale}/10`);
+      if (typeof s.emotionalScale === 'number') bits.push(`escala: ${s.emotionalScale}/10`);
       if (s.topics?.length) bits.push(`assuntos: ${s.topics.join(', ')}`);
       if (s.evolution) bits.push(`evolução: ${s.evolution}`);
       if (s.nextSteps) bits.push(`próximos passos: ${s.nextSteps}`);
       parts.push(`- ${bits.join('; ') || 'sem detalhes'}`);
     }
   }
+
+  // Linha do tempo (completa)
   if (events.length) {
-    const titles = events.slice(-4).map((e: any) => e.title).filter(Boolean);
-    if (titles.length) parts.push(`Marcos de vida: ${titles.join(', ')}.`);
+    parts.push('Linha do tempo:');
+    for (const e of events) {
+      const d = e.eventDate ? new Date(e.eventDate).toLocaleDateString('pt-BR') : '';
+      parts.push(`- ${d ? d + ': ' : ''}${e.title}${e.description ? ` — ${e.description}` : ''}`);
+    }
   }
+
   return parts.join('\n');
 }
 
@@ -546,33 +624,71 @@ patientRoutes.post('/ana-chat', zValidator('json', chatSchema), async (c) => {
   const { patientId, messages } = c.req.valid('json');
 
   let patientContext = '';
+
+  // Monta o contexto completo de um paciente (registro + consultas + timeline).
+  async function contextFor(row: any): Promise<string> {
+    const db = getDb(c.env);
+    const profile = row.profile ? JSON.parse(row.profile) : {};
+    const sessRows = await db
+      .select().from(sessions)
+      .where(eq(sessions.patientId, row.id))
+      .orderBy(desc(sessions.occurredAt))
+      .all();
+    const eventRows = await db
+      .select().from(timelineEvents)
+      .where(eq(timelineEvents.patientId, row.id))
+      .orderBy(asc(timelineEvents.eventDate))
+      .all();
+    return buildPatientContext(
+      { fullName: row.fullName, socialName: row.socialName, birthDate: row.birthDate, email: row.email, phone: row.phone, profile },
+      sessRows.map(serializeSession),
+      eventRows,
+    );
+  }
+
   if (patientId) {
+    // Paciente aberto no momento.
     const row = await findPatient(c, user, patientId);
     if (row) {
-      const db = getDb(c.env);
-      const profile = row.profile ? JSON.parse(row.profile) : {};
-      const sessRows = await db
-        .select().from(sessions)
-        .where(eq(sessions.patientId, patientId))
-        .orderBy(desc(sessions.occurredAt))
-        .all();
-      const eventRows = await db
-        .select().from(timelineEvents)
-        .where(eq(timelineEvents.patientId, patientId))
-        .orderBy(asc(timelineEvents.eventDate))
-        .all();
       patientContext =
         '\n\nCONTEXTO DO PACIENTE EM ATENDIMENTO (use quando a pergunta for sobre "este paciente"):\n' +
-        buildPatientContext({ fullName: row.fullName, birthDate: row.birthDate, profile }, sessRows.map(serializeSession), eventRows);
+        (await contextFor(row));
+    }
+  } else {
+    // Nenhum paciente aberto: tenta identificar um nome citado na última mensagem.
+    const lastUser = [...messages].reverse().find((m) => m.role === 'user')?.content ?? '';
+    const norm = (s: string) =>
+      s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const q = norm(lastUser);
+    if (q.length > 2) {
+      const all = await getDb(c.env)
+        .select()
+        .from(patients)
+        .where(and(eq(patients.clinicId, user.clinicId), isNull(patients.deletedAt)))
+        .all();
+      // Casa se qualquer parte do nome (>=3 letras) aparece na mensagem.
+      const match = all.find((pt) => {
+        const full = norm(pt.fullName);
+        if (q.includes(full)) return true;
+        return full.split(/\s+/).some((part) => part.length >= 3 && q.includes(part));
+      });
+      if (match) {
+        patientContext =
+          `\n\nCONTEXTO DO PACIENTE "${match.fullName}" (citado na pergunta):\n` +
+          (await contextFor(match));
+      }
     }
   }
 
   const system =
     'Você é a Ana Luiza, assistente de IA de um psicólogo dentro do sistema Vínculo. ' +
-    'Ajuda com dúvidas gerais de psicologia clínica E, quando há um paciente em ' +
-    'atendimento, comenta sobre ele a partir dos registros. Seja acolhedora, clara e ' +
-    'objetiva. Você observa, resume e sugere — NUNCA dá diagnóstico definitivo nem ' +
-    'substitui o julgamento do profissional. Responda em português do Brasil.' +
+    'Ajuda com dúvidas gerais de psicologia clínica E comenta sobre pacientes a partir ' +
+    'dos registros fornecidos no contexto. Quando um contexto de paciente é fornecido, ' +
+    'use os dados dele para responder (idade, ficha, consultas, evolução, etc.). Se a ' +
+    'informação pedida não estiver no contexto, diga que não consta nos registros — ' +
+    'nunca invente. Seja acolhedora, clara e objetiva. Você observa, resume e sugere — ' +
+    'NUNCA dá diagnóstico definitivo nem substitui o julgamento do profissional. ' +
+    'Responda em português do Brasil.' +
     patientContext;
 
   let answer = '';
