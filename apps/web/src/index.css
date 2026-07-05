@@ -649,9 +649,12 @@ input, textarea, select, button { font-family: inherit; }
   line-height: 1;
 }
 .auth-hero .brand-nologo .word-v {
-  color: var(--orange);
   font-size: 1.15em;
-  text-shadow: 0 2px 12px rgba(245, 130, 31, 0.4);
+  background: linear-gradient(150deg, #dfe4ee 0%, #8b93a7 40%, #2b3d82 100%);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: none;
+  filter: drop-shadow(0 2px 8px rgba(43, 61, 130, 0.45));
 }
 .auth-hero .brand-nologo .tag {
   font-size: 12.5px;
@@ -675,3 +678,7 @@ input, textarea, select, button { font-family: inherit; }
   .auth-hero .brand-nologo .word { font-size: 34px; }
   .hero-title { font-size: 24px; }
 }
+
+/* Selo VTECH agora é link clicável */
+a.hero-foot-badge { text-decoration: none; cursor: pointer; transition: transform 0.15s ease, background 0.15s ease; }
+a.hero-foot-badge:hover { transform: translateY(-1px); background: rgba(255, 255, 255, 0.13); }

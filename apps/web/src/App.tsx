@@ -146,10 +146,15 @@ function Auth({ onDone }: { onDone: () => void }) {
           <li>{t('hero.p2')}</li>
           <li>{t('hero.p3')}</li>
         </ul>
-        <div className="hero-foot-badge">
+        <a
+          className="hero-foot-badge"
+          href="https://vtechit.com.br"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
           <img src={VTECH_LOGO} alt="VTECH IT" className="hero-foot-logo" />
           <span className="hero-foot-text">{t('hero.foot')}</span>
-        </div>
+        </a>
       </div>
 
       <div className="auth-panel">
