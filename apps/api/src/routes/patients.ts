@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { and, eq, desc, asc } from 'drizzle-orm';
+import { and, eq, desc, asc, isNull, isNotNull } from 'drizzle-orm';
 import { getDb } from '../lib/db';
 import { patients, sessions, timelineEvents } from '@vinculo/db/schema';
 import { requireAuth } from '../middleware/auth';
@@ -25,6 +25,7 @@ function serializePatient(p: PatientRow, withProfile = true) {
     birthDate: p.birthDate,
     status: p.status,
     photo: p.photo,
+    deletedAt: p.deletedAt,
     createdAt: p.createdAt,
   };
   if (!withProfile) return base;
@@ -62,8 +63,20 @@ patientRoutes.get('/', async (c) => {
   const rows = await getDb(c.env)
     .select()
     .from(patients)
-    .where(eq(patients.clinicId, user.clinicId))
+    .where(and(eq(patients.clinicId, user.clinicId), isNull(patients.deletedAt)))
     .orderBy(desc(patients.createdAt))
+    .all();
+  return c.json({ patients: rows.map((p) => serializePatient(p, false)) });
+});
+
+// Lista os pacientes na lixeira (excluídos logicamente).
+patientRoutes.get('/trash', async (c) => {
+  const user = c.get('user');
+  const rows = await getDb(c.env)
+    .select()
+    .from(patients)
+    .where(and(eq(patients.clinicId, user.clinicId), isNotNull(patients.deletedAt)))
+    .orderBy(desc(patients.deletedAt))
     .all();
   return c.json({ patients: rows.map((p) => serializePatient(p, false)) });
 });
@@ -384,15 +397,60 @@ patientRoutes.get('/:id/ai-questions', async (c) => {
   return c.json({ questions });
 });
 
-// ---- Excluir paciente (com consultas e linha do tempo) ----------------------
+// ---- Lixeira (exclusão lógica) ---------------------------------------------
+
+// Mover para a lixeira (não apaga; marca deletedAt). Consultas e timeline ficam.
 patientRoutes.delete('/:id', async (c) => {
   const user = c.get('user');
   const id = c.req.param('id');
   const row = await findPatient(c, user, id);
   if (!row) return c.json({ error: 'not_found' }, 404);
 
+  await getDb(c.env)
+    .update(patients)
+    .set({ deletedAt: new Date() })
+    .where(and(eq(patients.id, id), eq(patients.clinicId, user.clinicId)));
+
+  await audit(c.env, {
+    clinicId: user.clinicId,
+    actorUserId: user.userId,
+    action: 'trash',
+    entity: 'patient',
+    entityId: id,
+  });
+  return c.json({ ok: true });
+});
+
+// Restaurar da lixeira.
+patientRoutes.post('/:id/restore', async (c) => {
+  const user = c.get('user');
+  const id = c.req.param('id');
+  const row = await findPatient(c, user, id);
+  if (!row) return c.json({ error: 'not_found' }, 404);
+
+  await getDb(c.env)
+    .update(patients)
+    .set({ deletedAt: null })
+    .where(and(eq(patients.id, id), eq(patients.clinicId, user.clinicId)));
+
+  await audit(c.env, {
+    clinicId: user.clinicId,
+    actorUserId: user.userId,
+    action: 'restore',
+    entity: 'patient',
+    entityId: id,
+  });
+  return c.json({ ok: true });
+});
+
+// Excluir DEFINITIVAMENTE (só faz sentido para quem já está na lixeira).
+patientRoutes.delete('/:id/permanent', async (c) => {
+  const user = c.get('user');
+  const id = c.req.param('id');
+  const row = await findPatient(c, user, id);
+  if (!row) return c.json({ error: 'not_found' }, 404);
+
   const db = getDb(c.env);
-  // Remove dependências antes do paciente (evita registros órfãos).
   await db.delete(timelineEvents).where(eq(timelineEvents.patientId, id));
   await db.delete(sessions).where(eq(sessions.patientId, id));
   await db.delete(patients).where(and(eq(patients.id, id), eq(patients.clinicId, user.clinicId)));
