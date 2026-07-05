@@ -25,7 +25,48 @@ export type Field = {
   options?: string[]; // lista fixa (datalist / estados)
   noEmpty?: boolean;
   wide?: boolean;
+  mask?: 'cpf' | 'phone' | 'cep'; // formatação automática
+  cap?: boolean; // capitaliza nomes (joão silva -> João Silva)
 };
+
+// Capitaliza nomes respeitando conectores (de, da, dos, e...).
+const LOWER_WORDS = new Set(['de', 'da', 'do', 'das', 'dos', 'e', 'di', 'du', 'del', 'van', 'von', 'la', 'y']);
+export function capitalizeName(raw: string): string {
+  return raw
+    .toLocaleLowerCase('pt-BR')
+    .split(/(\s+)/) // mantém os espaços
+    .map((part) => {
+      if (/^\s+$/.test(part) || part === '') return part;
+      if (LOWER_WORDS.has(part)) return part;
+      return part.charAt(0).toLocaleUpperCase('pt-BR') + part.slice(1);
+    })
+    .join('');
+}
+
+// Máscaras de formatação automática.
+export function applyMask(kind: 'cpf' | 'phone' | 'cep', raw: string): string {
+  const d = raw.replace(/\D/g, '');
+  if (kind === 'cpf') {
+    return d
+      .slice(0, 11)
+      .replace(/^(\d{3})(\d)/, '$1.$2')
+      .replace(/^(\d{3})\.(\d{3})(\d)/, '$1.$2.$3')
+      .replace(/\.(\d{3})(\d)/, '.$1-$2');
+  }
+  if (kind === 'cep') {
+    return d.slice(0, 8).replace(/^(\d{5})(\d)/, '$1-$2');
+  }
+  // phone / whatsapp: (11) 98888-7777 ou (11) 3333-4444
+  const p = d.slice(0, 11);
+  if (p.length <= 10) {
+    return p
+      .replace(/^(\d{2})(\d)/, '($1) $2')
+      .replace(/(\d{4})(\d)/, '$1-$2');
+  }
+  return p
+    .replace(/^(\d{2})(\d)/, '($1) $2')
+    .replace(/(\d{5})(\d)/, '$1-$2');
+}
 export type Section = { titleKey: string; fields: Field[] };
 
 export type Draft = {
@@ -164,7 +205,13 @@ export function FieldCtrl({
           </datalist>
         </>
       ) : (
-        <input type={field.type === 'date' ? 'date' : 'text'} value={val ?? ''} onChange={(e) => update(field.p, e.target.value)} />
+        <input
+          type={field.type === 'date' ? 'date' : 'text'}
+          value={val ?? ''}
+          inputMode={field.mask ? 'numeric' : undefined}
+          onChange={(e) => update(field.p, field.mask ? applyMask(field.mask, e.target.value) : e.target.value)}
+          onBlur={field.cap ? (e) => update(field.p, capitalizeName(e.target.value)) : undefined}
+        />
       )}
     </div>
   );
