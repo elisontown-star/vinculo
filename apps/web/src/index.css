@@ -508,3 +508,25 @@ input, textarea, select, button { font-family: inherit; }
 .pw-rules li::before { content: '○'; position: absolute; left: 4px; color: var(--muted); }
 .pw-rules li.ok { color: #1f8a4c; }
 .pw-rules li.ok::before { content: '✓'; color: #1f8a4c; font-weight: 700; }
+
+/* ======================================================================
+   MFA — configuração e verificação
+   ====================================================================== */
+.mfa-box { text-align: center; }
+.mfa-box h1 { font-family: 'Sora', system-ui, sans-serif; font-size: 22px; margin: 0 0 6px; color: var(--navy); }
+.mfa-box .sub { color: var(--muted); font-size: 14px; margin: 0 0 18px; line-height: 1.5; }
+.mfa-qr { display: flex; justify-content: center; margin: 8px 0 14px; }
+.mfa-qr img { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 8px; background: #fff; }
+.mfa-secret-label { font-size: 12px; color: var(--muted); margin: 0 0 4px; }
+.mfa-secret { display: inline-block; font-family: monospace; font-size: 14px; letter-spacing: 2px; background: var(--line-soft); padding: 8px 12px; border-radius: var(--radius-sm); margin-bottom: 18px; word-break: break-all; }
+.mfa-box .field input { text-align: center; font-size: 22px; letter-spacing: 8px; font-family: monospace; }
+.mfa-recovery { list-style: none; margin: 0 0 16px; padding: 16px; background: var(--line-soft); border-radius: var(--radius-sm); display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.mfa-recovery li { font-family: monospace; font-size: 15px; letter-spacing: 1px; color: var(--ink); }
+.link-toggle { display: block; margin: 14px auto 0; background: none; border: none; color: var(--navy); font-size: 13px; cursor: pointer; text-decoration: underline; }
+.link-toggle:hover { color: var(--orange-deep); }
+
+/* Layout centralizado das telas de MFA (com marca no topo) */
+.mfa-wrap { min-height: 100%; display: flex; flex-direction: column; background: var(--bg); }
+.mfa-topbar { display: flex; align-items: center; justify-content: space-between; padding: 20px 28px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.mfa-center { flex: 1; display: grid; place-items: center; padding: 32px 20px; }
+.mfa-center .auth-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 36px 32px; max-width: 420px; }

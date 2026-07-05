@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { api, setToken, clearToken, setUser } from './lib/api';
 import { useI18n } from './i18n';
 import { Controls } from './Controls';
+import { MfaSetup, MfaChallenge } from './Mfa';
 import Workspace from './Workspace';
 
 const VTECH_LOGO =
@@ -36,6 +37,7 @@ function Auth({ onDone }: { onDone: () => void }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [mfaStep, setMfaStep] = useState<null | { kind: 'setup' | 'challenge'; token: string }>(null);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -54,10 +56,20 @@ function Auth({ onDone }: { onDone: () => void }) {
     }
     setBusy(true);
     try {
-      const res =
+      const res: any =
         mode === 'register'
           ? await api.register({ clinicName, name, email, password })
           : await api.login({ email, password });
+
+      if (res.mfaSetupRequired) {
+        setMfaStep({ kind: 'setup', token: res.setupToken });
+        return;
+      }
+      if (res.mfaRequired) {
+        setMfaStep({ kind: 'challenge', token: res.challengeToken });
+        return;
+      }
+      // (fluxo antigo, sem MFA — fallback)
       setToken(res.token);
       setUser(res.user);
       onDone();
@@ -66,6 +78,37 @@ function Auth({ onDone }: { onDone: () => void }) {
     } finally {
       setBusy(false);
     }
+  }
+
+  if (mfaStep?.kind === 'setup') {
+    return (
+      <div className="mfa-wrap">
+        <div className="mfa-topbar">
+          <Brand />
+          <Controls />
+        </div>
+        <div className="mfa-center">
+          <div className="auth-card">
+            <MfaSetup setupToken={mfaStep.token} onDone={onDone} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+  if (mfaStep?.kind === 'challenge') {
+    return (
+      <div className="mfa-wrap">
+        <div className="mfa-topbar">
+          <Brand />
+          <Controls />
+        </div>
+        <div className="mfa-center">
+          <div className="auth-card">
+            <MfaChallenge challengeToken={mfaStep.token} onDone={onDone} />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
