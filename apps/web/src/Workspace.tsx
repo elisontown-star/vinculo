@@ -267,7 +267,9 @@ export default function Workspace({ onLogout }: { onLogout: () => void }) {
               <button className={tab === 'consulta' ? 'on' : ''} onClick={() => setTab('consulta')}>{t('tab.consulta')}</button>
               <button className={tab === 'ficha' ? 'on' : ''} onClick={() => setTab('ficha')}>{t('tab.ficha')}</button>
               <button className={tab === 'timeline' ? 'on' : ''} onClick={() => setTab('timeline')}>{t('tab.timeline')}</button>
-              <button className={tab === 'ana' ? 'on' : ''} onClick={() => setTab('ana')}>{t('tab.ana')}</button>
+              <button className={`tab-ana ${tab === 'ana' ? 'on' : ''}`} onClick={() => setTab('ana')}>
+                <span className="tab-ana-spark">✨</span> {t('tab.ana')}
+              </button>
             </nav>
 
             <div className="tab-body">

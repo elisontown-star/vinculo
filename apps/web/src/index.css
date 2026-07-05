@@ -405,3 +405,42 @@ input, textarea, select, button { font-family: inherit; }
   font-weight: 600; border-radius: var(--radius-sm); padding: 6px 10px;
 }
 .link-danger:hover { background: rgba(192, 57, 43, 0.08); }
+
+/* Aba Ana Luiza — botão especial com brilho dourado/laranja pulsante */
+.tab-ana {
+  position: relative;
+  font-weight: 600 !important;
+  color: var(--orange-deep) !important;
+  border-radius: 10px 10px 0 0;
+  background: linear-gradient(180deg, var(--orange-tint) 0%, transparent 100%) !important;
+}
+.tab-ana .tab-ana-spark {
+  display: inline-block;
+  animation: ana-twinkle 2.2s ease-in-out infinite;
+}
+.tab-ana.on {
+  color: var(--orange-deep) !important;
+  border-bottom-color: var(--orange) !important;
+  box-shadow: 0 0 0 1px rgba(245, 130, 31, 0.25), 0 -2px 14px rgba(245, 130, 31, 0.25);
+}
+/* Brilho pulsante ao redor do botão */
+.tab-ana::after {
+  content: '';
+  position: absolute;
+  inset: 2px 4px;
+  border-radius: 8px;
+  pointer-events: none;
+  box-shadow: 0 0 8px 1px rgba(245, 130, 31, 0.35);
+  opacity: 0;
+  animation: ana-glow 2.6s ease-in-out infinite;
+}
+.tab-ana:hover::after { opacity: 0.6; }
+
+@keyframes ana-glow {
+  0%, 100% { opacity: 0.15; box-shadow: 0 0 6px 0 rgba(245, 130, 31, 0.3); }
+  50%      { opacity: 0.55; box-shadow: 0 0 16px 3px rgba(245, 130, 31, 0.5); }
+}
+@keyframes ana-twinkle {
+  0%, 100% { transform: scale(1) rotate(0deg); opacity: 1; }
+  50%      { transform: scale(1.25) rotate(8deg); opacity: 0.85; }
+}
