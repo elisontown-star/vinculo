@@ -1,18 +1,42 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { sign } from 'hono/jwt';
+import { sign, verify } from 'hono/jwt';
 import { eq } from 'drizzle-orm';
 import { getDb } from '../lib/db';
 import { clinics, users } from '@vinculo/db/schema';
 import { hashPassword, verifyPassword } from '../lib/password';
 import { audit } from '../lib/audit';
 import { rateLimit, clientIp } from '../lib/ratelimit';
+import {
+  newSecret,
+  otpauthUri,
+  verifyTotp,
+  generateRecoveryCodes,
+  hashRecoveryCodes,
+  consumeRecoveryCode,
+} from '../lib/mfa';
 import type { AppBindings, Env } from '../types';
 
 export const authRoutes = new Hono<AppBindings>();
 
 type UserRow = { id: string; clinicId: string; role: string; name: string; email: string };
+
+// Token curto que autoriza só o passo de MFA (setup ou desafio).
+async function issueStepToken(env: Env, userId: string, purpose: 'setup' | 'challenge'): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+  return sign({ sub: userId, step: purpose, iat: now, exp: now + 60 * 10 }, env.JWT_SECRET, 'HS256');
+}
+
+async function readStepToken(env: Env, token: string, purpose: 'setup' | 'challenge'): Promise<string | null> {
+  try {
+    const p: any = await verify(token, env.JWT_SECRET, 'HS256');
+    if (p.step !== purpose) return null;
+    return p.sub as string;
+  } catch {
+    return null;
+  }
+}
 
 async function issueToken(env: Env, user: UserRow): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
@@ -67,11 +91,9 @@ authRoutes.post('/register', zValidator('json', registerSchema), async (c) => {
     entityId: clinic.id,
   });
 
-  const token = await issueToken(c.env, user);
-  return c.json(
-    { token, user: { id: user.id, name: user.name, email: user.email, role: user.role } },
-    201,
-  );
+  // MFA obrigatório: novo dono precisa configurar antes de entrar.
+  const setupToken = await issueStepToken(c.env, user.id, 'setup');
+  return c.json({ mfaSetupRequired: true, setupToken }, 201);
 });
 
 const loginSchema = z.object({ email: z.string().email(), password: z.string() });
@@ -89,6 +111,97 @@ authRoutes.post('/login', zValidator('json', loginSchema), async (c) => {
 
   const ok = await verifyPassword(password, user.passwordHash);
   if (!ok) return c.json({ error: 'invalid_credentials' }, 401);
+
+  // MFA obrigatório. Se ainda não configurou, exige setup antes de entrar.
+  if (!user.mfaEnabled) {
+    const setupToken = await issueStepToken(c.env, user.id, 'setup');
+    return c.json({ mfaSetupRequired: true, setupToken });
+  }
+  // MFA ativo: pede o código do app.
+  const challengeToken = await issueStepToken(c.env, user.id, 'challenge');
+  return c.json({ mfaRequired: true, challengeToken });
+});
+
+// ---- MFA: iniciar configuração (gera segredo + QR) --------------------------
+authRoutes.post('/mfa/setup/start', async (c) => {
+  const auth = c.req.header('Authorization')?.replace('Bearer ', '') ?? '';
+  const userId = await readStepToken(c.env, auth, 'setup');
+  if (!userId) return c.json({ error: 'invalid_step_token' }, 401);
+
+  const db = getDb(c.env);
+  const user = await db.select().from(users).where(eq(users.id, userId)).get();
+  if (!user) return c.json({ error: 'not_found' }, 404);
+
+  const secret = newSecret();
+  // Guarda o segredo provisoriamente (ainda não ativa o MFA).
+  await db.update(users).set({ mfaSecret: secret }).where(eq(users.id, userId));
+  const uri = otpauthUri(secret, user.email);
+  return c.json({ secret, uri });
+});
+
+// ---- MFA: confirmar configuração (valida 1º código, ativa, gera recuperação) ----
+const confirmSchema = z.object({ code: z.string().min(6).max(10) });
+authRoutes.post('/mfa/setup/confirm', zValidator('json', confirmSchema), async (c) => {
+  const auth = c.req.header('Authorization')?.replace('Bearer ', '') ?? '';
+  const userId = await readStepToken(c.env, auth, 'setup');
+  if (!userId) return c.json({ error: 'invalid_step_token' }, 401);
+
+  const db = getDb(c.env);
+  const user = await db.select().from(users).where(eq(users.id, userId)).get();
+  if (!user || !user.mfaSecret) return c.json({ error: 'no_pending_setup' }, 400);
+
+  const { code } = c.req.valid('json');
+  if (!verifyTotp(user.mfaSecret, code)) return c.json({ error: 'invalid_code' }, 401);
+
+  const recovery = generateRecoveryCodes(8);
+  const hashes = await hashRecoveryCodes(recovery);
+  await db
+    .update(users)
+    .set({ mfaEnabled: true, mfaRecoveryCodes: JSON.stringify(hashes) })
+    .where(eq(users.id, userId));
+
+  await audit(c.env, { clinicId: user.clinicId, actorUserId: user.id, action: 'mfa_enabled', entity: 'user', entityId: user.id });
+
+  const token = await issueToken(c.env, user);
+  // Retorna os códigos de recuperação UMA vez (mostrar ao usuário para guardar).
+  return c.json({
+    token,
+    recoveryCodes: recovery,
+    user: { id: user.id, name: user.name, email: user.email, role: user.role },
+  });
+});
+
+// ---- MFA: verificar código no login (app ou recuperação) --------------------
+const verifySchema = z.object({ code: z.string().min(6).max(20) });
+authRoutes.post('/login/mfa', zValidator('json', verifySchema), async (c) => {
+  const ip = clientIp(c.req.raw.headers);
+  if (!(await rateLimit(c.env, `mfa:${ip}`, 10, 60))) {
+    return c.json({ error: 'rate_limited' }, 429);
+  }
+  const auth = c.req.header('Authorization')?.replace('Bearer ', '') ?? '';
+  const userId = await readStepToken(c.env, auth, 'challenge');
+  if (!userId) return c.json({ error: 'invalid_step_token' }, 401);
+
+  const db = getDb(c.env);
+  const user = await db.select().from(users).where(eq(users.id, userId)).get();
+  if (!user || !user.mfaEnabled || !user.mfaSecret) return c.json({ error: 'invalid_credentials' }, 401);
+
+  const { code } = c.req.valid('json');
+
+  // 1) tenta código do app
+  let valid = verifyTotp(user.mfaSecret, code);
+
+  // 2) senão, tenta código de recuperação (consome o usado)
+  if (!valid && user.mfaRecoveryCodes) {
+    const remaining = await consumeRecoveryCode(code, JSON.parse(user.mfaRecoveryCodes));
+    if (remaining) {
+      valid = true;
+      await db.update(users).set({ mfaRecoveryCodes: JSON.stringify(remaining) }).where(eq(users.id, userId));
+      await audit(c.env, { clinicId: user.clinicId, actorUserId: user.id, action: 'mfa_recovery_used', entity: 'user', entityId: user.id });
+    }
+  }
+
+  if (!valid) return c.json({ error: 'invalid_code' }, 401);
 
   const token = await issueToken(c.env, user);
   return c.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });

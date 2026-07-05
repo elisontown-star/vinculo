@@ -30,6 +30,10 @@ export const users = sqliteTable(
     patientId: text('patient_id'),
     // Segredo TOTP (MFA) — populado na Etapa de autenticação forte.
     mfaSecret: text('mfa_secret'),
+    // MFA ativo (TOTP confirmado pelo usuário).
+    mfaEnabled: integer('mfa_enabled', { mode: 'boolean' }).notNull().default(false),
+    // Códigos de recuperação (JSON de hashes) para acesso sem o app.
+    mfaRecoveryCodes: text('mfa_recovery_codes'),
     isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
     createdAt: createdAt(),
   },

@@ -103,6 +103,13 @@ export const api = {
   register: (b: unknown) => req('/auth/register', { method: 'POST', body: JSON.stringify(b) }),
   login: (b: unknown) => req('/auth/login', { method: 'POST', body: JSON.stringify(b) }),
 
+  mfaSetupStart: (stepToken: string): Promise<{ secret: string; uri: string }> =>
+    req('/auth/mfa/setup/start', { method: 'POST', headers: { Authorization: `Bearer ${stepToken}` } }),
+  mfaSetupConfirm: (stepToken: string, code: string): Promise<{ token: string; recoveryCodes: string[]; user: unknown }> =>
+    req('/auth/mfa/setup/confirm', { method: 'POST', headers: { Authorization: `Bearer ${stepToken}` }, body: JSON.stringify({ code }) }),
+  loginMfa: (challengeToken: string, code: string): Promise<{ token: string; user: unknown }> =>
+    req('/auth/login/mfa', { method: 'POST', headers: { Authorization: `Bearer ${challengeToken}` }, body: JSON.stringify({ code }) }),
+
   listPatients: (): Promise<{ patients: Patient[] }> => req('/patients'),
   createPatient: (b: Partial<Patient>): Promise<{ patient: Patient }> =>
     req('/patients', { method: 'POST', body: JSON.stringify(b) }),
