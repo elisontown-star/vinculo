@@ -23,6 +23,7 @@ export type Patient = {
   status: string;
   photo?: string | null;
   profile?: Profile;
+  deletedAt?: number | null;
   createdAt: number;
 };
 
@@ -126,4 +127,18 @@ export const api = {
     id: string,
   ): Promise<{ questions: string[]; cached?: boolean; empty?: boolean }> =>
     req(`/patients/${id}/ai-questions`),
+
+  deletePatient: (id: string): Promise<{ ok: boolean }> =>
+    req(`/patients/${id}`, { method: 'DELETE' }),
+
+  listTrash: (): Promise<{ patients: Patient[] }> => req('/patients/trash'),
+  restorePatient: (id: string): Promise<{ ok: boolean }> =>
+    req(`/patients/${id}/restore`, { method: 'POST' }),
+  deletePatientPermanent: (id: string): Promise<{ ok: boolean }> =>
+    req(`/patients/${id}/permanent`, { method: 'DELETE' }),
+
+  anaChat: (
+    body: { patientId?: string; messages: { role: 'user' | 'assistant'; content: string }[] },
+  ): Promise<{ answer: string }> =>
+    req('/patients/ana-chat', { method: 'POST', body: JSON.stringify(body) }),
 };
