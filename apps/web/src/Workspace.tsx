@@ -30,11 +30,13 @@ function PatientRail({
   selectedId,
   onSelect,
   onAdd,
+  onOpenTrash,
 }: {
   patients: Patient[];
   selectedId: string | null;
   onSelect: (id: string) => void;
   onAdd: (fullName: string) => Promise<void>;
+  onOpenTrash: () => void;
 }) {
   const { t } = useI18n();
   const [query, setQuery] = useState('');
@@ -82,6 +84,9 @@ function PatientRail({
           {busy ? '…' : t('btn.add')}
         </button>
       </form>
+      <button className="rail-trash" onClick={onOpenTrash} title={t('trash.title')}>
+        🗑 <span>{t('trash.title')}</span>
+      </button>
     </aside>
   );
 }
@@ -159,6 +164,45 @@ export default function Workspace({ onLogout }: { onLogout: () => void }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  const [trashOpen, setTrashOpen] = useState(false);
+  const [trash, setTrash] = useState<Patient[]>([]);
+  const [trashLoading, setTrashLoading] = useState(false);
+  const [confirmPurge, setConfirmPurge] = useState<Patient | null>(null);
+
+  async function openTrash() {
+    setTrashOpen(true);
+    setTrashLoading(true);
+    try {
+      const res = await api.listTrash();
+      setTrash(res.patients);
+    } catch (err) {
+      setError(te(err instanceof Error ? err.message : 'generic'));
+    } finally {
+      setTrashLoading(false);
+    }
+  }
+
+  async function restore(id: string) {
+    try {
+      await api.restorePatient(id);
+      setTrash((t) => t.filter((p) => p.id !== id));
+      await loadPatients();
+    } catch (err) {
+      setError(te(err instanceof Error ? err.message : 'generic'));
+    }
+  }
+
+  async function purge(id: string) {
+    try {
+      await api.deletePatientPermanent(id);
+      setTrash((t) => t.filter((p) => p.id !== id));
+      setConfirmPurge(null);
+    } catch (err) {
+      setError(te(err instanceof Error ? err.message : 'generic'));
+      setConfirmPurge(null);
+    }
+  }
+
   async function handleDelete() {
     if (!patient) return;
     setDeleting(true);
@@ -194,7 +238,7 @@ export default function Workspace({ onLogout }: { onLogout: () => void }) {
       {error && <div className="container"><div className="error">{error}</div></div>}
 
       <div className="workspace two">
-        <PatientRail patients={patients} selectedId={selectedId} onSelect={select} onAdd={addPatient} />
+        <PatientRail patients={patients} selectedId={selectedId} onSelect={select} onAdd={addPatient} onOpenTrash={openTrash} />
 
         {selectedId && patient ? (
           <main className="ws-main">
@@ -247,14 +291,14 @@ export default function Workspace({ onLogout }: { onLogout: () => void }) {
             {confirmDelete && (
               <div className="modal-overlay" onClick={() => !deleting && setConfirmDelete(false)}>
                 <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-                  <h3>{t('patient.deleteTitle')}</h3>
-                  <p>{t('patient.deleteWarn').replace('{name}', patient.fullName)}</p>
+                  <h3>{t('patient.trashTitle')}</h3>
+                  <p>{t('patient.trashWarn').replace('{name}', patient.fullName)}</p>
                   <div className="modal-actions">
                     <button className="ghost" onClick={() => setConfirmDelete(false)} disabled={deleting}>
                       {t('btn.cancel')}
                     </button>
                     <button className="btn-danger" onClick={handleDelete} disabled={deleting}>
-                      {deleting ? t('patient.deleting') : t('patient.deleteConfirm')}
+                      {deleting ? t('patient.deleting') : t('patient.trashConfirm')}
                     </button>
                   </div>
                 </div>
@@ -270,6 +314,49 @@ export default function Workspace({ onLogout }: { onLogout: () => void }) {
           </div>
         )}
       </div>
+
+      {trashOpen && (
+        <div className="modal-overlay" onClick={() => setTrashOpen(false)}>
+          <div className="modal-box trash-box" onClick={(e) => e.stopPropagation()}>
+            <h3>🗑 {t('trash.title')}</h3>
+            <p className="trash-sub">{t('trash.subtitle')}</p>
+            {trashLoading ? (
+              <p className="trash-empty">{t('trash.loading')}</p>
+            ) : trash.length === 0 ? (
+              <p className="trash-empty">{t('trash.empty')}</p>
+            ) : (
+              <ul className="trash-list">
+                {trash.map((p) => (
+                  <li key={p.id}>
+                    <span className="avatar sm">{p.photo ? <img src={p.photo} alt="" /> : initials(p.fullName)}</span>
+                    <span className="trash-name">{p.fullName}</span>
+                    <span className="trash-btns">
+                      <button className="ghost sm" onClick={() => restore(p.id)}>{t('trash.restore')}</button>
+                      <button className="link-danger sm" onClick={() => setConfirmPurge(p)}>{t('trash.purge')}</button>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="modal-actions">
+              <button className="ghost" onClick={() => setTrashOpen(false)}>{t('btn.close')}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmPurge && (
+        <div className="modal-overlay" onClick={() => setConfirmPurge(null)}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+            <h3>{t('trash.purgeTitle')}</h3>
+            <p>{t('trash.purgeWarn').replace('{name}', confirmPurge.fullName)}</p>
+            <div className="modal-actions">
+              <button className="ghost" onClick={() => setConfirmPurge(null)}>{t('btn.cancel')}</button>
+              <button className="btn-danger" onClick={() => purge(confirmPurge.id)}>{t('trash.purgeConfirm')}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
