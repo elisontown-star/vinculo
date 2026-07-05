@@ -395,7 +395,7 @@ patientRoutes.get('/:id/ai-questions', async (c) => {
   let aiDetail = '';
   try {
     console.log('[ana] chamando Workers AI para paciente', id);
-    const res: any = await c.env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
+    const res: any = await c.env.AI.run('@cf/meta/llama-3.3-70b-instruct-fp8-fast', {
       messages: [
         { role: 'system', content: system },
         { role: 'user', content: context },
