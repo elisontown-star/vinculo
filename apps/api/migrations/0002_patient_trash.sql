@@ -1,0 +1,1 @@
+ALTER TABLE `patients` ADD `deleted_at` integer;
