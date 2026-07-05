@@ -3,6 +3,7 @@ import { api, setToken, clearToken, setUser } from './lib/api';
 import { useI18n } from './i18n';
 import { Controls } from './Controls';
 import { MfaSetup, MfaChallenge } from './Mfa';
+import { ForgotPassword } from './ForgotPassword';
 import Workspace from './Workspace';
 
 const VTECH_LOGO =
@@ -38,6 +39,7 @@ function Auth({ onDone }: { onDone: () => void }) {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [mfaStep, setMfaStep] = useState<null | { kind: 'setup' | 'challenge'; token: string }>(null);
+  const [showForgot, setShowForgot] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -78,6 +80,22 @@ function Auth({ onDone }: { onDone: () => void }) {
     } finally {
       setBusy(false);
     }
+  }
+
+  if (showForgot) {
+    return (
+      <div className="mfa-wrap">
+        <div className="mfa-topbar">
+          <Brand />
+          <Controls />
+        </div>
+        <div className="mfa-center">
+          <div className="auth-card">
+            <ForgotPassword onBack={() => setShowForgot(false)} />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (mfaStep?.kind === 'setup') {
@@ -126,7 +144,10 @@ function Auth({ onDone }: { onDone: () => void }) {
           <li>{t('hero.p2')}</li>
           <li>{t('hero.p3')}</li>
         </ul>
-        <span className="hero-foot">{t('hero.foot')}</span>
+        <div className="hero-foot-badge">
+          <img src={VTECH_LOGO} alt="VTECH IT" className="hero-foot-logo" />
+          <span className="hero-foot-text">{t('hero.foot')}</span>
+        </div>
       </div>
 
       <div className="auth-panel">
@@ -170,6 +191,12 @@ function Auth({ onDone }: { onDone: () => void }) {
               {busy ? t('btn.wait') : mode === 'register' ? t('btn.createClinic') : t('btn.enter')}
             </button>
           </form>
+
+          {mode === 'login' && (
+            <button className="link-forgot" type="button" onClick={() => setShowForgot(true)}>
+              {t('fp.link')}
+            </button>
+          )}
 
           <div className="switch">
             {mode === 'register' ? (
