@@ -5,7 +5,9 @@ export interface Env {
   APP_ENV: string;
   // Origem(ns) permitida(s) no CORS (separadas por vírgula).
   WEB_ORIGIN: string;
-  // Vectorize (VEC) e Workers AI (AI) entram na Etapa 2, quando o RAG começar.
+  // Workers AI — Ana Luiza usa para sugerir perguntas de sessão.
+  AI: Ai;
+  // Vectorize (VEC) entra depois, quando o RAG começar.
 }
 
 export interface AuthUser {
