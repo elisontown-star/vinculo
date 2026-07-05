@@ -383,3 +383,26 @@ patientRoutes.get('/:id/ai-questions', async (c) => {
   }
   return c.json({ questions });
 });
+
+// ---- Excluir paciente (com consultas e linha do tempo) ----------------------
+patientRoutes.delete('/:id', async (c) => {
+  const user = c.get('user');
+  const id = c.req.param('id');
+  const row = await findPatient(c, user, id);
+  if (!row) return c.json({ error: 'not_found' }, 404);
+
+  const db = getDb(c.env);
+  // Remove dependências antes do paciente (evita registros órfãos).
+  await db.delete(timelineEvents).where(eq(timelineEvents.patientId, id));
+  await db.delete(sessions).where(eq(sessions.patientId, id));
+  await db.delete(patients).where(and(eq(patients.id, id), eq(patients.clinicId, user.clinicId)));
+
+  await audit(c.env, {
+    clinicId: user.clinicId,
+    actorUserId: user.userId,
+    action: 'delete',
+    entity: 'patient',
+    entityId: id,
+  });
+  return c.json({ ok: true });
+});
