@@ -444,3 +444,60 @@ input, textarea, select, button { font-family: inherit; }
   0%, 100% { transform: scale(1) rotate(0deg); opacity: 1; }
   50%      { transform: scale(1.25) rotate(8deg); opacity: 0.85; }
 }
+
+/* ======================================================================
+   Ana Luiza — chatbot flutuante
+   ====================================================================== */
+.ana-fab {
+  position: fixed; right: 24px; bottom: 24px; z-index: 900;
+  width: 60px; height: 60px; border-radius: 50%; border: none; cursor: pointer;
+  background: linear-gradient(135deg, var(--orange) 0%, var(--orange-deep) 100%);
+  color: #fff; font-size: 26px; display: grid; place-items: center;
+  box-shadow: 0 6px 20px rgba(245, 130, 31, 0.45);
+  animation: ana-fab-pulse 2.8s ease-in-out infinite;
+}
+.ana-fab:hover { transform: scale(1.08); }
+.ana-fab-spark { display: inline-block; animation: ana-twinkle 2.2s ease-in-out infinite; }
+@keyframes ana-fab-pulse {
+  0%, 100% { box-shadow: 0 6px 20px rgba(245, 130, 31, 0.4); }
+  50%      { box-shadow: 0 6px 28px 4px rgba(245, 130, 31, 0.65); }
+}
+
+.ana-chat {
+  position: fixed; right: 24px; bottom: 24px; z-index: 901;
+  width: 380px; max-width: calc(100vw - 32px); height: 560px; max-height: calc(100vh - 48px);
+  background: var(--surface); border-radius: var(--radius); overflow: hidden;
+  display: flex; flex-direction: column; box-shadow: var(--shadow-lg);
+  border: 1px solid var(--line);
+}
+.ana-chat-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px; color: #fff;
+  background: linear-gradient(135deg, var(--navy) 0%, var(--navy-2) 100%);
+}
+.ana-chat-title { font-family: 'Sora', system-ui, sans-serif; font-weight: 600; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+.ana-chat-close { background: none; border: none; color: #fff; font-size: 24px; cursor: pointer; line-height: 1; opacity: 0.85; }
+.ana-chat-close:hover { opacity: 1; }
+
+.ana-chat-body { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; background: var(--bg); }
+.ana-chat-welcome { color: var(--muted); font-size: 13.5px; line-height: 1.5; text-align: center; padding: 20px 8px; }
+.ana-chat-ctx { color: var(--orange-deep); font-weight: 600; margin-top: 8px; }
+
+.ana-msg { max-width: 85%; padding: 9px 13px; border-radius: 14px; font-size: 14px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+.ana-msg.user { align-self: flex-end; background: var(--navy); color: #fff; border-bottom-right-radius: 4px; }
+.ana-msg.assistant { align-self: flex-start; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
+.ana-typing { color: var(--muted); font-style: italic; }
+.ana-chat-err { align-self: center; color: var(--danger); font-size: 13px; }
+
+.ana-chat-input { display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--line); background: var(--surface); }
+.ana-chat-input textarea {
+  flex: 1; resize: none; border: 1px solid var(--line); border-radius: 12px;
+  padding: 9px 12px; font-family: inherit; font-size: 14px; max-height: 100px; line-height: 1.4;
+}
+.ana-chat-input textarea:focus { outline: none; border-color: var(--orange); }
+.ana-chat-input button {
+  border: none; background: var(--orange); color: #fff; border-radius: 12px;
+  width: 42px; font-size: 16px; cursor: pointer; flex: none;
+}
+.ana-chat-input button:disabled { opacity: 0.5; cursor: default; }
+.ana-chat-note { font-size: 10.5px; color: var(--muted); text-align: center; margin: 0; padding: 6px 12px 10px; background: var(--surface); }

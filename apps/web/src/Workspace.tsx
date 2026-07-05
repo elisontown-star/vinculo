@@ -9,6 +9,7 @@ import ConsultaTab from './tabs/ConsultaTab';
 import FichaTab from './tabs/FichaTab';
 import TimelineTab from './tabs/TimelineTab';
 import AnaLuizaTab from './tabs/AnaLuizaTab';
+import AnaChat from './AnaChat';
 
 type Tab = 'dados' | 'consulta' | 'ficha' | 'timeline' | 'ana';
 
@@ -359,6 +360,8 @@ export default function Workspace({ onLogout }: { onLogout: () => void }) {
           </div>
         </div>
       )}
+
+      <AnaChat patientId={selectedId ?? undefined} />
     </>
   );
 }
