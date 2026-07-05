@@ -30,8 +30,6 @@
     { "binding": "CACHE", "id": "03d32e120047416585c2b224dc47a47c" }
   ],
 
-
-  // IA (Etapa 2): quando começar o RAG, adicione de volta:
-  //   "vectorize": [{ "binding": "VEC", "index_name": "vinculo-pacientes" }],
-  //   "ai": { "binding": "AI" }
+  // Workers AI — usado pela Ana Luiza para sugerir perguntas de sessão.
+  "ai": { "binding": "AI" }
 }
