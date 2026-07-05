@@ -113,7 +113,7 @@ export default function AnaLuizaTab({
   return (
     <div className="ana-tab">
       <div className="ana-hero">
-        <div className="ana-avatar">AL</div>
+        <div className="ana-avatar">✨</div>
         <div className="ana-hero-txt">
           <h3>{t('ana.title')}</h3>
           <p>{t('ana.subtitle')}</p>
