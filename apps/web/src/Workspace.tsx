@@ -87,7 +87,7 @@ function PatientRail({
 }
 
 export default function Workspace({ onLogout }: { onLogout: () => void }) {
-  const { t, lang } = useI18n();
+  const { t, te, lang } = useI18n();
   const user = getUser();
   const [patients, setPatients] = useState<Patient[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -156,6 +156,26 @@ export default function Workspace({ onLogout }: { onLogout: () => void }) {
     select(res.patient.id);
   }
 
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleDelete() {
+    if (!patient) return;
+    setDeleting(true);
+    try {
+      await api.deletePatient(patient.id);
+      setConfirmDelete(false);
+      setSelectedId(null);
+      setPatient(null);
+      await loadPatients();
+    } catch (err) {
+      setError(te(err instanceof Error ? err.message : 'generic'));
+      setConfirmDelete(false);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   const age = ageFrom(patient?.birthDate);
 
   return (
@@ -193,6 +213,9 @@ export default function Workspace({ onLogout }: { onLogout: () => void }) {
                 </p>
               </div>
               <span className={`pill ${patient.status}`}>{patient.status === 'active' ? t('status.active') : t('status.inactive')}</span>
+              <button className="btn-delete-patient" onClick={() => setConfirmDelete(true)} title={t('patient.delete')}>
+                🗑 {t('patient.delete')}
+              </button>
             </header>
 
             <nav className="tabs">
@@ -220,6 +243,23 @@ export default function Workspace({ onLogout }: { onLogout: () => void }) {
                 <AnaLuizaTab key={`a-${patient.id}`} patient={patient} sessions={sessions} events={events} />
               )}
             </div>
+
+            {confirmDelete && (
+              <div className="modal-overlay" onClick={() => !deleting && setConfirmDelete(false)}>
+                <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+                  <h3>{t('patient.deleteTitle')}</h3>
+                  <p>{t('patient.deleteWarn').replace('{name}', patient.fullName)}</p>
+                  <div className="modal-actions">
+                    <button className="ghost" onClick={() => setConfirmDelete(false)} disabled={deleting}>
+                      {t('btn.cancel')}
+                    </button>
+                    <button className="btn-danger" onClick={handleDelete} disabled={deleting}>
+                      {deleting ? t('patient.deleting') : t('patient.deleteConfirm')}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </main>
         ) : (
           <div className="ws-empty">
