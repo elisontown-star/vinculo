@@ -126,4 +126,7 @@ export const api = {
     id: string,
   ): Promise<{ questions: string[]; cached?: boolean; empty?: boolean }> =>
     req(`/patients/${id}/ai-questions`),
+
+  deletePatient: (id: string): Promise<{ ok: boolean }> =>
+    req(`/patients/${id}`, { method: 'DELETE' }),
 };
