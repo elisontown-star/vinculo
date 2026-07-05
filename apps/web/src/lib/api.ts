@@ -121,4 +121,9 @@ export const api = {
     req(`/patients/${id}/timeline`, { method: 'POST', body: JSON.stringify(b) }),
   deleteTimelineEvent: (id: string, eventId: string): Promise<{ ok: boolean }> =>
     req(`/patients/${id}/timeline/${eventId}`, { method: 'DELETE' }),
+
+  aiQuestions: (
+    id: string,
+  ): Promise<{ questions: string[]; cached?: boolean; empty?: boolean }> =>
+    req(`/patients/${id}/ai-questions`),
 };
