@@ -501,3 +501,10 @@ input, textarea, select, button { font-family: inherit; }
 }
 .ana-chat-input button:disabled { opacity: 0.5; cursor: default; }
 .ana-chat-note { font-size: 10.5px; color: var(--muted); text-align: center; margin: 0; padding: 6px 12px 10px; background: var(--surface); }
+
+/* Requisitos de senha no cadastro */
+.pw-rules { list-style: none; margin: -6px 0 12px; padding: 10px 12px; background: var(--line-soft); border-radius: var(--radius-sm); display: flex; flex-direction: column; gap: 4px; }
+.pw-rules li { font-size: 12.5px; color: var(--muted); padding-left: 20px; position: relative; }
+.pw-rules li::before { content: '○'; position: absolute; left: 4px; color: var(--muted); }
+.pw-rules li.ok { color: #1f8a4c; }
+.pw-rules li.ok::before { content: '✓'; color: #1f8a4c; font-weight: 700; }

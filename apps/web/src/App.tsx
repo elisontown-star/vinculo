@@ -40,6 +40,18 @@ function Auth({ onDone }: { onDone: () => void }) {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
+    if (mode === 'register') {
+      const strong =
+        password.length >= 8 &&
+        /[a-z]/.test(password) &&
+        /[A-Z]/.test(password) &&
+        /[0-9]/.test(password) &&
+        /[^A-Za-z0-9]/.test(password);
+      if (!strong) {
+        setError(t('pw.tooWeak'));
+        return;
+      }
+    }
     setBusy(true);
     try {
       const res =
@@ -102,6 +114,15 @@ function Auth({ onDone }: { onDone: () => void }) {
               <label htmlFor="password">{t('lbl.password')}</label>
               <input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={8} required />
             </div>
+            {mode === 'register' && password.length > 0 && (
+              <ul className="pw-rules">
+                <li className={password.length >= 8 ? 'ok' : ''}>{t('pw.length')}</li>
+                <li className={/[a-z]/.test(password) ? 'ok' : ''}>{t('pw.lower')}</li>
+                <li className={/[A-Z]/.test(password) ? 'ok' : ''}>{t('pw.upper')}</li>
+                <li className={/[0-9]/.test(password) ? 'ok' : ''}>{t('pw.number')}</li>
+                <li className={/[^A-Za-z0-9]/.test(password) ? 'ok' : ''}>{t('pw.special')}</li>
+              </ul>
+            )}
             <button className="btn" disabled={busy}>
               {busy ? t('btn.wait') : mode === 'register' ? t('btn.createClinic') : t('btn.enter')}
             </button>
