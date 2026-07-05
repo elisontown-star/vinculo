@@ -505,6 +505,8 @@ const chatSchema = z.object({
 });
 
 patientRoutes.post('/ana-chat', zValidator('json', chatSchema), async (c) => {
+  console.log('[ana-chat] rota alcançada');
+  try {
   const user = c.get('user');
   const { patientId, messages } = c.req.valid('json');
 
@@ -554,4 +556,9 @@ patientRoutes.post('/ana-chat', zValidator('json', chatSchema), async (c) => {
 
   if (!answer) return c.json({ error: 'empty' }, 502);
   return c.json({ answer });
+  } catch (err) {
+    const msg = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+    console.error('[ana-chat] ERRO GERAL:', msg);
+    return c.json({ error: 'chat_failed', detail: msg }, 500);
+  }
 });
