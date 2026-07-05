@@ -23,6 +23,7 @@ export type Patient = {
   status: string;
   photo?: string | null;
   profile?: Profile;
+  deletedAt?: number | null;
   createdAt: number;
 };
 
@@ -129,4 +130,10 @@ export const api = {
 
   deletePatient: (id: string): Promise<{ ok: boolean }> =>
     req(`/patients/${id}`, { method: 'DELETE' }),
+
+  listTrash: (): Promise<{ patients: Patient[] }> => req('/patients/trash'),
+  restorePatient: (id: string): Promise<{ ok: boolean }> =>
+    req(`/patients/${id}/restore`, { method: 'POST' }),
+  deletePatientPermanent: (id: string): Promise<{ ok: boolean }> =>
+    req(`/patients/${id}/permanent`, { method: 'DELETE' }),
 };
