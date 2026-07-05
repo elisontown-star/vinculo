@@ -291,11 +291,36 @@ patientRoutes.delete('/:id/timeline/:eventId', async (c) => {
 // reprocessar a cada abertura da aba (mais rápido e barato). A IA observa e
 // sugere — nunca diagnostica.
 
+function calcAge(birthMs?: number | null): number | null {
+  if (!birthMs) return null;
+  const b = new Date(birthMs);
+  const now = new Date();
+  let a = now.getFullYear() - b.getFullYear();
+  const m = now.getMonth() - b.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < b.getDate())) a--;
+  return a;
+}
+
 function buildPatientContext(patient: any, sess: any[], events: any[]): string {
   const p = patient.profile ?? {};
   const parts: string[] = [];
   parts.push(`Paciente: ${patient.fullName}.`);
+
+  // Dados pessoais / identificação
+  const pers = p.personal ?? {};
+  const age = calcAge(patient.birthDate);
+  const idBits: string[] = [];
+  if (age != null) idBits.push(`${age} anos`);
+  if (patient.birthDate) idBits.push(`nascido(a) em ${new Date(patient.birthDate).toLocaleDateString('pt-BR')}`);
+  if (pers.sex) idBits.push(`sexo: ${pers.sex}`);
+  if (pers.gender) idBits.push(`gênero: ${pers.gender}`);
+  if (pers.maritalStatus) idBits.push(`estado civil: ${pers.maritalStatus}`);
+  if (pers.profession) idBits.push(`profissão: ${pers.profession}`);
+  if (pers.city || pers.state) idBits.push(`cidade: ${[pers.city, pers.state].filter(Boolean).join('/')}`);
+  if (idBits.length) parts.push(`Dados pessoais: ${idBits.join('; ')}.`);
+
   if (p.clinical?.complaint) parts.push(`Queixa principal: ${p.clinical.complaint}`);
+  if (p.clinical?.history) parts.push(`Histórico: ${p.clinical.history}`);
   if (p.clinical?.goals) parts.push(`Objetivos: ${p.clinical.goals}`);
   if (p.clinical?.suffering) parts.push(`Nível de sofrimento: ${p.clinical.suffering}`);
 
@@ -305,6 +330,16 @@ function buildPatientContext(patient: any, sess: any[], events: any[]): string {
   if (p.health?.bipolar) flags.push('indicativo de bipolaridade');
   if (p.health?.tdah) flags.push('indicativo de TDAH');
   if (flags.length) parts.push(`Sinalizações da ficha: ${flags.join(', ')}.`);
+  if (p.health?.medications) parts.push(`Medicações: ${p.health.medications}`);
+
+  // Estilo de vida e interesses (resumo)
+  const life = p.lifestyle ?? {};
+  const lifeBits: string[] = [];
+  if (life.sleep) lifeBits.push(`sono: ${life.sleep}`);
+  if (life.alcohol) lifeBits.push(`álcool: ${life.alcohol}`);
+  if (life.religion) lifeBits.push(`religião: ${life.religion}`);
+  if (lifeBits.length) parts.push(`Estilo de vida: ${lifeBits.join('; ')}.`);
+  if (p.interests?.hobbies) parts.push(`Interesses/hobbies: ${p.interests.hobbies}`);
 
   const recent = sess.slice(0, 4);
   if (recent.length) {
@@ -334,7 +369,7 @@ patientRoutes.get('/:id/ai-questions', async (c) => {
 
   const db = getDb(c.env);
   const profile = patientRow.profile ? JSON.parse(patientRow.profile) : {};
-  const patient = { fullName: patientRow.fullName, profile };
+  const patient = { fullName: patientRow.fullName, birthDate: patientRow.birthDate, profile };
   const sessRows = await db
     .select().from(sessions)
     .where(eq(sessions.patientId, id))
@@ -528,7 +563,7 @@ patientRoutes.post('/ana-chat', zValidator('json', chatSchema), async (c) => {
         .all();
       patientContext =
         '\n\nCONTEXTO DO PACIENTE EM ATENDIMENTO (use quando a pergunta for sobre "este paciente"):\n' +
-        buildPatientContext({ fullName: row.fullName, profile }, sessRows.map(serializeSession), eventRows);
+        buildPatientContext({ fullName: row.fullName, birthDate: row.birthDate, profile }, sessRows.map(serializeSession), eventRows);
     }
   }
 
