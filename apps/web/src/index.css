@@ -636,3 +636,42 @@ input, textarea, select, button { font-family: inherit; }
     animation: none !important;
   }
 }
+
+/* ======================================================================
+   Ajustes da tela de login (marca, título, formulário centralizado)
+   ====================================================================== */
+
+/* Nome "Vínculo" mais evidente no hero, com o V destacado em laranja */
+.auth-hero .brand-nologo .word {
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1;
+}
+.auth-hero .brand-nologo .word-v {
+  color: var(--orange);
+  font-size: 1.15em;
+  text-shadow: 0 2px 12px rgba(245, 130, 31, 0.4);
+}
+.auth-hero .brand-nologo .tag {
+  font-size: 12.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+.auth-hero .brand-nologo { margin-bottom: 34px; }
+
+/* Título um pouco menor */
+.hero-title { font-size: 27px; }
+
+/* Formulário (lado direito) com conteúdo centralizado */
+.auth-panel .auth-card { text-align: center; }
+.auth-panel .auth-card h1 { text-align: center; }
+.auth-panel .auth-card .sub { text-align: center; }
+.auth-panel .auth-card .field { text-align: left; } /* labels/inputs seguem alinhados à esquerda para leitura */
+.auth-panel .auth-card .switch { text-align: center; }
+
+@media (max-width: 980px) {
+  .auth-hero .brand-nologo .word { font-size: 34px; }
+  .hero-title { font-size: 24px; }
+}

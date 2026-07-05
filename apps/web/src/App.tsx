@@ -9,20 +9,22 @@ import Workspace from './Workspace';
 const VTECH_LOGO =
   'https://vtechit.com.br/wp-content/uploads/2026/05/cropped-Blue-and-Orange-Modern-Letter-V-Technology-Logo.png';
 
-export function Brand() {
+export function Brand({ hideLogo = false }: { hideLogo?: boolean }) {
   const { t } = useI18n();
   return (
-    <div className="brand">
-      <img
-        className="brand-logo"
-        src={VTECH_LOGO}
-        alt="Vtech IT"
-        onError={(e) => {
-          (e.currentTarget as HTMLImageElement).style.display = 'none';
-        }}
-      />
+    <div className={`brand ${hideLogo ? 'brand-nologo' : ''}`}>
+      {!hideLogo && (
+        <img
+          className="brand-logo"
+          src={VTECH_LOGO}
+          alt="Vtech IT"
+          onError={(e) => {
+            (e.currentTarget as HTMLImageElement).style.display = 'none';
+          }}
+        />
+      )}
       <div className="brand-text">
-        <span className="word">Vínculo</span>
+        <span className="word"><span className="word-v">V</span>ínculo</span>
         <span className="tag">{t('brand.tag')}</span>
       </div>
     </div>
@@ -136,7 +138,7 @@ function Auth({ onDone }: { onDone: () => void }) {
       </div>
 
       <div className="auth-hero">
-        <Brand />
+        <Brand hideLogo />
         <h2 className="hero-title">{t('hero.title')}</h2>
         <p className="hero-sub">{t('hero.sub')}</p>
         <ul className="hero-points">
