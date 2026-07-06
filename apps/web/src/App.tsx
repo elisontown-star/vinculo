@@ -42,7 +42,14 @@ function Auth({ onDone }: { onDone: () => void }) {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [mfaStep, setMfaStep] = useState<null | { kind: 'setup' | 'challenge'; token: string }>(null);
-  const [showForgot, setShowForgot] = useState(false);
+  const resetParams = (() => {
+    const p = new URLSearchParams(window.location.search);
+    if (p.get('reset') === '1') {
+      return { email: p.get('email') ?? '', code: p.get('code') ?? '' };
+    }
+    return null;
+  })();
+  const [showForgot, setShowForgot] = useState(!!resetParams);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -94,7 +101,14 @@ function Auth({ onDone }: { onDone: () => void }) {
         </div>
         <div className="mfa-center">
           <div className="auth-card">
-            <ForgotPassword onBack={() => setShowForgot(false)} />
+            <ForgotPassword
+              onBack={() => {
+                setShowForgot(false);
+                window.history.replaceState({}, '', '/');
+              }}
+              initialEmail={resetParams?.email}
+              initialCode={resetParams?.code}
+            />
           </div>
         </div>
       </div>
