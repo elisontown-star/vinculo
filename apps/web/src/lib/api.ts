@@ -4,6 +4,8 @@ const token = () => localStorage.getItem('vinculo_token');
 export const setToken = (t: string) => localStorage.setItem('vinculo_token', t);
 export const clearToken = () => localStorage.removeItem('vinculo_token');
 export const setUser = (u: unknown) => localStorage.setItem('vinculo_user', JSON.stringify(u));
+export const getDeviceToken = () => localStorage.getItem('vinculo_device') ?? '';
+export const setDeviceToken = (t: string) => localStorage.setItem('vinculo_device', t);
 export const getUser = () => {
   const s = localStorage.getItem('vinculo_user');
   return s ? JSON.parse(s) : null;
@@ -101,7 +103,7 @@ async function req(path: string, opts: RequestInit = {}) {
 
 export const api = {
   register: (b: unknown) => req('/auth/register', { method: 'POST', body: JSON.stringify(b) }),
-  login: (b: unknown) => req('/auth/login', { method: 'POST', body: JSON.stringify(b) }),
+  login: (b: unknown) => req('/auth/login', { method: 'POST', headers: { 'X-Device-Token': getDeviceToken() }, body: JSON.stringify(b) }),
 
   forgotPassword: (email: string): Promise<{ ok: boolean }> =>
     req('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
@@ -112,8 +114,8 @@ export const api = {
     req('/auth/mfa/setup/start', { method: 'POST', headers: { Authorization: `Bearer ${stepToken}` } }),
   mfaSetupConfirm: (stepToken: string, code: string): Promise<{ token: string; recoveryCodes: string[]; user: unknown }> =>
     req('/auth/mfa/setup/confirm', { method: 'POST', headers: { Authorization: `Bearer ${stepToken}` }, body: JSON.stringify({ code }) }),
-  loginMfa: (challengeToken: string, code: string): Promise<{ token: string; user: unknown }> =>
-    req('/auth/login/mfa', { method: 'POST', headers: { Authorization: `Bearer ${challengeToken}` }, body: JSON.stringify({ code }) }),
+  loginMfa: (challengeToken: string, code: string, trustDevice?: boolean): Promise<{ token: string; deviceToken?: string; user: unknown }> =>
+    req('/auth/login/mfa', { method: 'POST', headers: { Authorization: `Bearer ${challengeToken}` }, body: JSON.stringify({ code, trustDevice }) }),
 
   listPatients: (): Promise<{ patients: Patient[] }> => req('/patients'),
   createPatient: (b: Partial<Patient>): Promise<{ patient: Patient }> =>
