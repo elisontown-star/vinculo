@@ -137,10 +137,12 @@ export const api = {
     req(`/admin/clinics/${clinicId}/users`),
   adminResetMfa: (userId: string): Promise<{ ok: boolean }> =>
     req(`/admin/users/${userId}/reset-mfa`, { method: 'POST' }),
-  adminResetPassword: (userId: string): Promise<{ ok: boolean; tempPassword: string }> =>
+  adminResetPassword: (userId: string): Promise<{ ok: boolean; email: string }> =>
     req(`/admin/users/${userId}/reset-password`, { method: 'POST' }),
   adminToggleClinic: (clinicId: string, isActive: boolean): Promise<{ ok: boolean }> =>
     req(`/admin/clinics/${clinicId}/active`, { method: 'POST', body: JSON.stringify({ isActive }) }),
+  adminSearch: (q: string): Promise<{ users: (AdminUser & { clinicId: string; clinicName: string })[]; clinics: { id: string; name: string; isActive: boolean; createdAt: number }[] }> =>
+    req(`/admin/search?q=${encodeURIComponent(q)}`),
 
   mfaSetupStart: (stepToken: string): Promise<{ secret: string; uri: string }> =>
     req('/auth/mfa/setup/start', { method: 'POST', headers: { Authorization: `Bearer ${stepToken}` } }),
