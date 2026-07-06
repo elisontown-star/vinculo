@@ -13,6 +13,25 @@ export const getUser = () => {
 
 export type Profile = Record<string, any>;
 
+export type AdminClinic = {
+  id: string;
+  name: string;
+  createdAt: number;
+  isActive: boolean;
+  users: number;
+  patients: number;
+};
+
+export type AdminUser = {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  isActive: boolean;
+  mfaEnabled: boolean;
+  createdAt: number;
+};
+
 export type Patient = {
   id: string;
   fullName: string;
@@ -109,6 +128,19 @@ export const api = {
     req('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
   resetPassword: (b: { email: string; code: string; password: string }): Promise<{ ok: boolean }> =>
     req('/auth/reset-password', { method: 'POST', body: JSON.stringify(b) }),
+
+  // --- Painel do super admin ---
+  adminStats: (): Promise<{ clinics: number; users: number; patients: number }> =>
+    req('/admin/stats'),
+  adminClinics: (): Promise<{ clinics: AdminClinic[] }> => req('/admin/clinics'),
+  adminClinicUsers: (clinicId: string): Promise<{ users: AdminUser[] }> =>
+    req(`/admin/clinics/${clinicId}/users`),
+  adminResetMfa: (userId: string): Promise<{ ok: boolean }> =>
+    req(`/admin/users/${userId}/reset-mfa`, { method: 'POST' }),
+  adminResetPassword: (userId: string): Promise<{ ok: boolean; tempPassword: string }> =>
+    req(`/admin/users/${userId}/reset-password`, { method: 'POST' }),
+  adminToggleClinic: (clinicId: string, isActive: boolean): Promise<{ ok: boolean }> =>
+    req(`/admin/clinics/${clinicId}/active`, { method: 'POST', body: JSON.stringify({ isActive }) }),
 
   mfaSetupStart: (stepToken: string): Promise<{ secret: string; uri: string }> =>
     req('/auth/mfa/setup/start', { method: 'POST', headers: { Authorization: `Bearer ${stepToken}` } }),
