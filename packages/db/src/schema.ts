@@ -9,6 +9,7 @@ const createdAt = () =>
 export const clinics = sqliteTable('clinics', {
   id: id(),
   name: text('name').notNull(),
+  isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
   createdAt: createdAt(),
 });
 
@@ -23,7 +24,7 @@ export const users = sqliteTable(
     passwordHash: text('password_hash').notNull(),
     name: text('name').notNull(),
     // Perfis de acesso (RBAC). "patient" = login do Portal do Paciente.
-    role: text('role', { enum: ['owner', 'psychologist', 'secretary', 'patient'] })
+    role: text('role', { enum: ['platform_admin', 'owner', 'psychologist', 'secretary', 'patient'] })
       .notNull()
       .default('psychologist'),
     // Preenchido quando role = 'patient', ligando o login ao prontuário.
