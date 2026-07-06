@@ -5,6 +5,8 @@ export interface Env {
   APP_ENV: string;
   // Origem(ns) permitida(s) no CORS (separadas por vírgula).
   WEB_ORIGIN: string;
+  // Chave da API do Resend (envio de e-mail). Configurada como secret.
+  RESEND_API_KEY: string;
   // Workers AI — Ana Luiza usa para sugerir perguntas de sessão.
   AI: Ai;
   // Vectorize (VEC) entra depois, quando o RAG começar.
