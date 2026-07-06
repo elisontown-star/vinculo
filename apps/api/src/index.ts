@@ -4,6 +4,7 @@ import { secureHeaders } from 'hono/secure-headers';
 import type { AppBindings } from './types';
 import { authRoutes } from './routes/auth';
 import { patientRoutes } from './routes/patients';
+import { adminRoutes } from './routes/admin';
 
 const app = new Hono<AppBindings>();
 
@@ -41,6 +42,7 @@ app.get('/health', (c) =>
 
 app.route('/auth', authRoutes);
 app.route('/patients', patientRoutes);
+app.route('/admin', adminRoutes);
 
 app.notFound((c) => c.json({ error: 'not_found' }, 404));
 
