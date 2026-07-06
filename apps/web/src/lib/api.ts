@@ -103,6 +103,11 @@ export const api = {
   register: (b: unknown) => req('/auth/register', { method: 'POST', body: JSON.stringify(b) }),
   login: (b: unknown) => req('/auth/login', { method: 'POST', body: JSON.stringify(b) }),
 
+  forgotPassword: (email: string): Promise<{ ok: boolean }> =>
+    req('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
+  resetPassword: (b: { email: string; code: string; password: string }): Promise<{ ok: boolean }> =>
+    req('/auth/reset-password', { method: 'POST', body: JSON.stringify(b) }),
+
   mfaSetupStart: (stepToken: string): Promise<{ secret: string; uri: string }> =>
     req('/auth/mfa/setup/start', { method: 'POST', headers: { Authorization: `Bearer ${stepToken}` } }),
   mfaSetupConfirm: (stepToken: string, code: string): Promise<{ token: string; recoveryCodes: string[]; user: unknown }> =>
