@@ -4,12 +4,33 @@ const token = () => localStorage.getItem('vinculo_token');
 export const setToken = (t: string) => localStorage.setItem('vinculo_token', t);
 export const clearToken = () => localStorage.removeItem('vinculo_token');
 export const setUser = (u: unknown) => localStorage.setItem('vinculo_user', JSON.stringify(u));
+export const getDeviceToken = () => localStorage.getItem('vinculo_device') ?? '';
+export const setDeviceToken = (t: string) => localStorage.setItem('vinculo_device', t);
 export const getUser = () => {
   const s = localStorage.getItem('vinculo_user');
   return s ? JSON.parse(s) : null;
 };
 
 export type Profile = Record<string, any>;
+
+export type AdminClinic = {
+  id: string;
+  name: string;
+  createdAt: number;
+  isActive: boolean;
+  users: number;
+  patients: number;
+};
+
+export type AdminUser = {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  isActive: boolean;
+  mfaEnabled: boolean;
+  createdAt: number;
+};
 
 export type Patient = {
   id: string;
@@ -101,7 +122,34 @@ async function req(path: string, opts: RequestInit = {}) {
 
 export const api = {
   register: (b: unknown) => req('/auth/register', { method: 'POST', body: JSON.stringify(b) }),
-  login: (b: unknown) => req('/auth/login', { method: 'POST', body: JSON.stringify(b) }),
+  login: (b: unknown) => req('/auth/login', { method: 'POST', headers: { 'X-Device-Token': getDeviceToken() }, body: JSON.stringify(b) }),
+
+  forgotPassword: (email: string): Promise<{ ok: boolean }> =>
+    req('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
+  resetPassword: (b: { email: string; code: string; password: string }): Promise<{ ok: boolean }> =>
+    req('/auth/reset-password', { method: 'POST', body: JSON.stringify(b) }),
+
+  // --- Painel do super admin ---
+  adminStats: (): Promise<{ clinics: number; users: number; patients: number }> =>
+    req('/admin/stats'),
+  adminClinics: (): Promise<{ clinics: AdminClinic[] }> => req('/admin/clinics'),
+  adminClinicUsers: (clinicId: string): Promise<{ users: AdminUser[] }> =>
+    req(`/admin/clinics/${clinicId}/users`),
+  adminResetMfa: (userId: string): Promise<{ ok: boolean }> =>
+    req(`/admin/users/${userId}/reset-mfa`, { method: 'POST' }),
+  adminResetPassword: (userId: string): Promise<{ ok: boolean; email: string }> =>
+    req(`/admin/users/${userId}/reset-password`, { method: 'POST' }),
+  adminToggleClinic: (clinicId: string, isActive: boolean): Promise<{ ok: boolean }> =>
+    req(`/admin/clinics/${clinicId}/active`, { method: 'POST', body: JSON.stringify({ isActive }) }),
+  adminSearch: (q: string): Promise<{ users: (AdminUser & { clinicId: string; clinicName: string })[]; clinics: { id: string; name: string; isActive: boolean; createdAt: number }[] }> =>
+    req(`/admin/search?q=${encodeURIComponent(q)}`),
+
+  mfaSetupStart: (stepToken: string): Promise<{ secret: string; uri: string }> =>
+    req('/auth/mfa/setup/start', { method: 'POST', headers: { Authorization: `Bearer ${stepToken}` } }),
+  mfaSetupConfirm: (stepToken: string, code: string): Promise<{ token: string; recoveryCodes: string[]; user: unknown }> =>
+    req('/auth/mfa/setup/confirm', { method: 'POST', headers: { Authorization: `Bearer ${stepToken}` }, body: JSON.stringify({ code }) }),
+  loginMfa: (challengeToken: string, code: string, trustDevice?: boolean): Promise<{ token: string; deviceToken?: string; user: unknown }> =>
+    req('/auth/login/mfa', { method: 'POST', headers: { Authorization: `Bearer ${challengeToken}` }, body: JSON.stringify({ code, trustDevice }) }),
 
   listPatients: (): Promise<{ patients: Patient[] }> => req('/patients'),
   createPatient: (b: Partial<Patient>): Promise<{ patient: Patient }> =>
