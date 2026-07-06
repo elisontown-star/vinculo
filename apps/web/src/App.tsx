@@ -239,17 +239,24 @@ function Auth({ onDone }: { onDone: () => void }) {
 
 export default function App() {
   const [authed, setAuthed] = useState<boolean>(!!localStorage.getItem('vinculo_token'));
+  const [adminView, setAdminView] = useState<'admin' | 'clinic'>('admin');
 
   function logout() {
     clearToken();
     localStorage.removeItem('vinculo_user');
     setAuthed(false);
+    setAdminView('admin');
   }
 
   if (!authed) return <Auth onDone={() => setAuthed(true)} />;
 
   const user = getUser();
-  if (user?.role === 'platform_admin') return <AdminPanel onLogout={logout} />;
+  if (user?.role === 'platform_admin') {
+    if (adminView === 'clinic') {
+      return <Workspace onLogout={logout} onBackToAdmin={() => setAdminView('admin')} />;
+    }
+    return <AdminPanel onLogout={logout} onViewClinic={() => setAdminView('clinic')} />;
+  }
 
   return <Workspace onLogout={logout} />;
 }

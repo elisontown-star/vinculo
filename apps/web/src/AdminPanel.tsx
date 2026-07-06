@@ -4,7 +4,7 @@ import { useI18n } from './i18n';
 import { Brand } from './App';
 import { Controls } from './Controls';
 
-export default function AdminPanel({ onLogout }: { onLogout: () => void }) {
+export default function AdminPanel({ onLogout, onViewClinic }: { onLogout: () => void; onViewClinic?: () => void }) {
   const { t } = useI18n();
   const [view, setView] = useState<'clinics' | 'search'>('clinics');
   const [stats, setStats] = useState<{ clinics: number; users: number; patients: number } | null>(null);
@@ -108,6 +108,9 @@ export default function AdminPanel({ onLogout }: { onLogout: () => void }) {
         <Brand />
         <div className="topbar-right">
           <span className="admin-badge">{t('admin.badge')}</span>
+          {onViewClinic && (
+            <button className="ghost sm" onClick={onViewClinic}>{t('admin.viewClinic')}</button>
+          )}
           <Controls />
           <button className="ghost sm" onClick={logout}>{t('btn.logout')}</button>
         </div>

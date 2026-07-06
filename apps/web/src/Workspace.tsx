@@ -92,7 +92,7 @@ function PatientRail({
   );
 }
 
-export default function Workspace({ onLogout }: { onLogout: () => void }) {
+export default function Workspace({ onLogout, onBackToAdmin }: { onLogout: () => void; onBackToAdmin?: () => void }) {
   const { t, te, lang } = useI18n();
   const user = getUser();
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -237,6 +237,9 @@ export default function Workspace({ onLogout }: { onLogout: () => void }) {
         <Brand />
         <div className="who">
           <Controls />
+          {onBackToAdmin && (
+            <button className="ghost" onClick={onBackToAdmin}>← {t('admin.backToAdmin')}</button>
+          )}
           <span>{user?.name}</span>
           <button className="ghost" onClick={onLogout}>
             {t('btn.logout')}
