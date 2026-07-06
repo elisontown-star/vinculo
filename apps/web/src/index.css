@@ -731,3 +731,26 @@ a.hero-foot-badge:hover { transform: translateY(-1px); background: rgba(255, 255
 /* Ajuste fino para Montserrat no corpo (ela é mais alta/larga que Inter) */
 body { line-height: 1.55; letter-spacing: -0.005em; }
 .field input, .field textarea, .field select { letter-spacing: -0.005em; }
+
+/* Foto do paciente ampliável (lightbox) */
+.avatar.clickable { cursor: zoom-in; transition: transform 0.15s ease, box-shadow 0.15s ease; }
+.avatar.clickable:hover { transform: scale(1.05); box-shadow: 0 4px 14px rgba(20, 26, 50, 0.25); }
+.photo-lightbox {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(10, 14, 30, 0.86);
+  display: grid; place-items: center; padding: 40px;
+  cursor: zoom-out; animation: lightbox-in 0.18s ease;
+}
+.photo-lightbox img {
+  max-width: min(92vw, 720px); max-height: 88vh;
+  border-radius: 12px; object-fit: contain; cursor: default;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+.photo-lightbox-close {
+  position: absolute; top: 20px; right: 26px;
+  background: rgba(255, 255, 255, 0.12); border: none; color: #fff;
+  width: 42px; height: 42px; border-radius: 50%; font-size: 26px; line-height: 1;
+  cursor: pointer; transition: background 0.15s ease;
+}
+.photo-lightbox-close:hover { background: rgba(255, 255, 255, 0.25); }
+@keyframes lightbox-in { from { opacity: 0; } to { opacity: 1; } }

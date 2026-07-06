@@ -163,6 +163,14 @@ export default function Workspace({ onLogout }: { onLogout: () => void }) {
   }
 
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [zoomPhoto, setZoomPhoto] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!zoomPhoto) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setZoomPhoto(null);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [zoomPhoto]);
   const [deleting, setDeleting] = useState(false);
 
   const [trashOpen, setTrashOpen] = useState(false);
@@ -248,7 +256,13 @@ export default function Workspace({ onLogout }: { onLogout: () => void }) {
             </button>
 
             <header className="ficha-header">
-              <span className="avatar lg">{patient.photo ? <img src={patient.photo} alt="" /> : initials(patient.fullName)}</span>
+              <span
+                className={`avatar lg ${patient.photo ? 'clickable' : ''}`}
+                onClick={() => patient.photo && setZoomPhoto(patient.photo)}
+                title={patient.photo ? t('photo.zoom') : undefined}
+              >
+                {patient.photo ? <img src={patient.photo} alt="" /> : initials(patient.fullName)}
+              </span>
               <div className="fh-info">
                 <h2>{patient.fullName}</h2>
                 <p className="ficha-meta">
@@ -361,6 +375,13 @@ export default function Workspace({ onLogout }: { onLogout: () => void }) {
               <button className="btn-danger" onClick={() => purge(confirmPurge.id)}>{t('trash.purgeConfirm')}</button>
             </div>
           </div>
+        </div>
+      )}
+
+      {zoomPhoto && (
+        <div className="photo-lightbox" onClick={() => setZoomPhoto(null)}>
+          <button className="photo-lightbox-close" onClick={() => setZoomPhoto(null)} aria-label={t('btn.close')}>×</button>
+          <img src={zoomPhoto} alt="" onClick={(e) => e.stopPropagation()} />
         </div>
       )}
 
