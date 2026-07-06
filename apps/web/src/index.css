@@ -650,11 +650,13 @@ input, textarea, select, button { font-family: inherit; }
 }
 .auth-hero .brand-nologo .word-v {
   font-size: 1.15em;
-  background: linear-gradient(150deg, #dfe4ee 0%, #8b93a7 40%, #2b3d82 100%);
-  -webkit-background-clip: text; background-clip: text;
-  -webkit-text-fill-color: transparent;
-  text-shadow: none;
-  filter: drop-shadow(0 2px 8px rgba(43, 61, 130, 0.45));
+  color: var(--navy);
+  background: none;
+  -webkit-text-fill-color: var(--navy);
+  text-shadow:
+    0 0 1px rgba(255, 255, 255, 0.9),
+    0 0 10px rgba(223, 228, 238, 0.5),
+    0 2px 6px rgba(0, 0, 0, 0.25);
 }
 .auth-hero .brand-nologo .tag {
   font-size: 12.5px;
