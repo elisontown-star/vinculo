@@ -12,7 +12,7 @@
     "APP_ENV": "development",
     // Origem(ns) permitida(s) no CORS. Em produção, troque pela URL do seu
     // front-end (ex.: "https://vinculo-web.pages.dev"). Aceita várias separadas por vírgula.
-    "WEB_ORIGIN": "http://localhost:5173"
+    "WEB_ORIGIN": "http://localhost:5173,https://vinculoclinico.com.br,https://www.vinculoclinico.com.br"
   },
 
   // Banco transacional (1 por ambiente; "1 banco por clínica" evoluímos depois).
