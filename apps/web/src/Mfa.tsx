@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import QRCode from 'qrcode';
-import { api, setToken, setUser } from './lib/api';
+import { api, setToken, setUser, setDeviceToken } from './lib/api';
 import { useI18n } from './i18n';
 
 // Fluxo de configuração do MFA (após login/cadastro de conta sem MFA).
@@ -124,15 +124,17 @@ export function MfaChallenge({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [useRecovery, setUseRecovery] = useState(false);
+  const [trust, setTrust] = useState(true);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
     setBusy(true);
     try {
-      const r = await api.loginMfa(challengeToken, code);
+      const r = await api.loginMfa(challengeToken, code, trust);
       setToken(r.token);
       setUser(r.user);
+      if (r.deviceToken) setDeviceToken(r.deviceToken);
       onDone();
     } catch (err) {
       setError(te(err instanceof Error ? err.message : 'generic'));
@@ -161,6 +163,12 @@ export function MfaChallenge({
             required
           />
         </div>
+        {!useRecovery && (
+          <label className="mfa-trust">
+            <input type="checkbox" checked={trust} onChange={(e) => setTrust(e.target.checked)} />
+            <span>{t('mfa.trustDevice')}</span>
+          </label>
+        )}
         <button className="btn" disabled={busy || code.length < 6}>
           {busy ? t('btn.wait') : t('mfa.verify')}
         </button>
