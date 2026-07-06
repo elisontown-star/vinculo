@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { api, setToken, clearToken, setUser } from './lib/api';
+import { api, setToken, clearToken, setUser, getUser } from './lib/api';
 import { useI18n } from './i18n';
 import { Controls } from './Controls';
 import { MfaSetup, MfaChallenge } from './Mfa';
 import { ForgotPassword } from './ForgotPassword';
 import Workspace from './Workspace';
+import AdminPanel from './AdminPanel';
 
 const VTECH_LOGO =
   'https://vtechit.com.br/wp-content/uploads/2026/05/cropped-Blue-and-Orange-Modern-Letter-V-Technology-Logo.png';
@@ -231,5 +232,10 @@ export default function App() {
     setAuthed(false);
   }
 
-  return authed ? <Workspace onLogout={logout} /> : <Auth onDone={() => setAuthed(true)} />;
+  if (!authed) return <Auth onDone={() => setAuthed(true)} />;
+
+  const user = getUser();
+  if (user?.role === 'platform_admin') return <AdminPanel onLogout={logout} />;
+
+  return <Workspace onLogout={logout} />;
 }
