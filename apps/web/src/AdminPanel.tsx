@@ -6,12 +6,19 @@ import { Controls } from './Controls';
 
 export default function AdminPanel({ onLogout }: { onLogout: () => void }) {
   const { t } = useI18n();
+  const [view, setView] = useState<'clinics' | 'search'>('clinics');
   const [stats, setStats] = useState<{ clinics: number; users: number; patients: number } | null>(null);
   const [clinics, setClinics] = useState<AdminClinic[]>([]);
   const [selected, setSelected] = useState<AdminClinic | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState('');
+
+  // Busca global
+  const [q, setQ] = useState('');
+  const [searchUsers, setSearchUsers] = useState<(AdminUser & { clinicName?: string })[]>([]);
+  const [searchClinics, setSearchClinics] = useState<{ id: string; name: string; isActive: boolean }[]>([]);
+  const [searching, setSearching] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -56,9 +63,24 @@ export default function AdminPanel({ onLogout }: { onLogout: () => void }) {
     if (!confirm(t('admin.confirmResetPw').replace('{name}', u.name))) return;
     try {
       const r = await api.adminResetPassword(u.id);
-      setMsg(t('admin.pwReset').replace('{name}', u.name).replace('{pw}', r.tempPassword));
+      setMsg(t('admin.pwEmailSent').replace('{email}', r.email));
     } catch {
       setMsg(t('admin.actionError'));
+    }
+  }
+
+  async function runSearch(e: React.FormEvent) {
+    e.preventDefault();
+    if (q.trim().length < 2) return;
+    setSearching(true);
+    try {
+      const r = await api.adminSearch(q.trim());
+      setSearchUsers(r.users);
+      setSearchClinics(r.clinics);
+    } catch {
+      setMsg(t('admin.actionError'));
+    } finally {
+      setSearching(false);
     }
   }
 
@@ -105,6 +127,66 @@ export default function AdminPanel({ onLogout }: { onLogout: () => void }) {
         {msg && <div className="admin-msg" onClick={() => setMsg('')}>{msg}</div>}
         {loading && <p className="admin-loading">{t('admin.loading')}</p>}
 
+        <div className="admin-tabs">
+          <button className={view === 'clinics' ? 'on' : ''} onClick={() => setView('clinics')}>{t('admin.tabClinics')}</button>
+          <button className={view === 'search' ? 'on' : ''} onClick={() => setView('search')}>{t('admin.tabSearch')}</button>
+        </div>
+
+        {view === 'search' && (
+          <div className="admin-search">
+            <form onSubmit={runSearch} className="admin-search-bar">
+              <input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder={t('admin.searchPlaceholder')}
+                autoFocus
+              />
+              <button className="btn sm" disabled={searching || q.trim().length < 2}>
+                {searching ? t('admin.loading') : t('admin.searchBtn')}
+              </button>
+            </form>
+
+            {searchClinics.length > 0 && (
+              <>
+                <h2 className="admin-h2">{t('admin.clinics')}</h2>
+                <div className="admin-list">
+                  {searchClinics.map((cl) => (
+                    <div key={cl.id} className={`admin-clinic ${cl.isActive ? '' : 'inactive'}`}>
+                      <div className="admin-clinic-name">{cl.name}{!cl.isActive && <em> · {t('admin.disabled')}</em>}</div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {searchUsers.length > 0 && (
+              <>
+                <h2 className="admin-h2" style={{ marginTop: 18 }}>{t('admin.users')}</h2>
+                <div className="admin-list">
+                  {searchUsers.map((u) => (
+                    <div key={u.id} className="admin-user">
+                      <div className="admin-user-info">
+                        <div className="admin-user-name">{u.name} <span className="admin-role">{u.role}</span></div>
+                        <div className="admin-user-email">{u.email} · {u.clinicName}</div>
+                        <div className="admin-user-flags">{u.mfaEnabled ? '🔒 MFA' : '⚠️ sem MFA'}</div>
+                      </div>
+                      <div className="admin-user-actions">
+                        <button className="ghost sm" onClick={() => resetMfa(u)}>{t('admin.resetMfa')}</button>
+                        <button className="ghost sm" onClick={() => resetPassword(u)}>{t('admin.resetPw')}</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {q.trim().length >= 2 && !searching && searchUsers.length === 0 && searchClinics.length === 0 && (
+              <p className="admin-loading">{t('admin.noResults')}</p>
+            )}
+          </div>
+        )}
+
+        {view === 'clinics' && (
         <div className="admin-grid">
           <div className="admin-col">
             <h2 className="admin-h2">{t('admin.allClinics')}</h2>
@@ -158,6 +240,7 @@ export default function AdminPanel({ onLogout }: { onLogout: () => void }) {
             )}
           </div>
         </div>
+        )}
 
         <p className="admin-privacy">{t('admin.privacyNote')}</p>
       </div>
