@@ -25,7 +25,7 @@ app.use('*', (c, next) =>
         allowed.includes(origin);
       return ok ? origin : (allowed[0] ?? null);
     },
-    allowHeaders: ['Content-Type', 'Authorization'],
+    allowHeaders: ['Content-Type', 'Authorization', 'X-Device-Token'],
     allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
   })(c, next),
 );
