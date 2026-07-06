@@ -5,7 +5,7 @@ import { eq, and, isNull, sql } from 'drizzle-orm';
 import { getDb } from '../lib/db';
 import { clinics, users, patients } from '@vinculo/db/schema';
 import { requireAuth, requireRole } from '../middleware/auth';
-import { hashPassword } from '../lib/password';
+import { sendPasswordResetEmail } from '../lib/email';
 import { audit } from '../lib/audit';
 import type { AppBindings } from '../types';
 
@@ -88,7 +88,7 @@ adminRoutes.post('/users/:id/reset-mfa', async (c) => {
   return c.json({ ok: true });
 });
 
-// --- Resetar senha de um usuário (gera uma temporária e retorna uma vez) -----
+// --- Resetar senha: dispara e-mail de redefinição ao usuário -----------------
 adminRoutes.post('/users/:id/reset-password', async (c) => {
   const userId = c.req.param('id');
   const db = getDb(c.env);
@@ -96,25 +96,34 @@ adminRoutes.post('/users/:id/reset-password', async (c) => {
   if (!target) return c.json({ error: 'not_found' }, 404);
   if (target.role === 'platform_admin') return c.json({ error: 'cannot_target_admin' }, 403);
 
-  // Senha temporária forte e aleatória.
-  const temp =
-    'Vc' +
-    Math.random().toString(36).slice(2, 8) +
-    '!' +
-    Math.floor(Math.random() * 90 + 10);
-  const passwordHash = await hashPassword(temp);
-  await db.update(users).set({ passwordHash }).where(eq(users.id, userId));
+  // Gera código de 6 dígitos, guarda no KV (15 min) e envia por e-mail —
+  // mesmo mecanismo do "esqueci minha senha".
+  const n = crypto.getRandomValues(new Uint32Array(1))[0] % 1000000;
+  const code = n.toString().padStart(6, '0');
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(code));
+  const codeHash = Array.from(new Uint8Array(buf), (b) => b.toString(16).padStart(2, '0')).join('');
+  await c.env.CACHE.put(
+    `pwreset:${target.email}`,
+    JSON.stringify({ codeHash, tries: 0 }),
+    { expirationTtl: 900 },
+  );
+
+  try {
+    await sendPasswordResetEmail(c.env, target.email, code);
+  } catch (err) {
+    console.error('[admin reset-password] envio falhou:', err instanceof Error ? err.message : String(err));
+    return c.json({ error: 'email_failed' }, 502);
+  }
 
   const admin = c.get('user');
   await audit(c.env, {
     clinicId: target.clinicId,
     actorUserId: admin.userId,
-    action: 'admin_reset_password',
+    action: 'admin_reset_password_email',
     entity: 'user',
     entityId: userId,
   });
-  // Retorna a senha temporária UMA vez para o admin repassar ao usuário.
-  return c.json({ ok: true, tempPassword: temp });
+  return c.json({ ok: true, email: target.email });
 });
 
 // --- Ativar/desativar uma clínica -------------------------------------------
@@ -139,6 +148,48 @@ adminRoutes.post('/clinics/:id/active', zValidator('json', toggleSchema), async 
     entityId: clinicId,
   });
   return c.json({ ok: true });
+});
+
+// --- Busca global: usuários e clínicas por nome ou e-mail --------------------
+adminRoutes.get('/search', async (c) => {
+  const q = (c.req.query('q') ?? '').trim().toLowerCase();
+  if (q.length < 2) return c.json({ users: [], clinics: [] });
+
+  const db = getDb(c.env);
+  const like = `%${q}%`;
+
+  const userRows = await db
+    .select()
+    .from(users)
+    .where(sql`lower(${users.name}) LIKE ${like} OR lower(${users.email}) LIKE ${like}`)
+    .limit(30)
+    .all();
+
+  const clinicRows = await db
+    .select()
+    .from(clinics)
+    .where(sql`lower(${clinics.name}) LIKE ${like}`)
+    .limit(30)
+    .all();
+
+  // Mapa de nomes de clínica para exibir junto do usuário.
+  const clinicNames = new Map<string, string>();
+  for (const cl of await db.select().from(clinics).all()) clinicNames.set(cl.id, cl.name);
+
+  return c.json({
+    users: userRows.map((u) => ({
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      role: u.role,
+      isActive: u.isActive,
+      mfaEnabled: u.mfaEnabled,
+      createdAt: u.createdAt,
+      clinicId: u.clinicId,
+      clinicName: clinicNames.get(u.clinicId) ?? '—',
+    })),
+    clinics: clinicRows.map((cl) => ({ id: cl.id, name: cl.name, isActive: cl.isActive ?? true, createdAt: cl.createdAt })),
+  });
 });
 
 // --- Estatísticas gerais da plataforma --------------------------------------
