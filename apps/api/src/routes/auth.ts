@@ -6,6 +6,7 @@ import { eq } from 'drizzle-orm';
 import { getDb } from '../lib/db';
 import { clinics, users } from '@vinculo/db/schema';
 import { hashPassword, verifyPassword } from '../lib/password';
+import { sendPasswordResetEmail } from '../lib/email';
 import { audit } from '../lib/audit';
 import { rateLimit, clientIp } from '../lib/ratelimit';
 import {
@@ -205,4 +206,101 @@ authRoutes.post('/login/mfa', zValidator('json', verifySchema), async (c) => {
 
   const token = await issueToken(c.env, user);
   return c.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+});
+
+// ---- Redefinição de senha por e-mail ---------------------------------------
+
+function sixDigitCode(): string {
+  const n = crypto.getRandomValues(new Uint32Array(1))[0] % 1000000;
+  return n.toString().padStart(6, '0');
+}
+
+async function sha256Hex(text: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf), (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+const forgotSchema = z.object({ email: z.string().email() });
+
+// Passo 1: solicitar código. Responde sempre 'ok' (não revela se o e-mail existe).
+authRoutes.post('/forgot-password', zValidator('json', forgotSchema), async (c) => {
+  const ip = clientIp(c.req.raw.headers);
+  if (!(await rateLimit(c.env, `forgot:${ip}`, 5, 300))) {
+    return c.json({ error: 'rate_limited' }, 429);
+  }
+  const { email } = c.req.valid('json');
+  const db = getDb(c.env);
+  const user = await db.select().from(users).where(eq(users.email, email)).get();
+
+  if (user && user.isActive) {
+    const code = sixDigitCode();
+    const codeHash = await sha256Hex(code);
+    // Guarda no KV por 15 min: chave por e-mail, valor = hash do código + tentativas.
+    await c.env.CACHE.put(
+      `pwreset:${email}`,
+      JSON.stringify({ codeHash, tries: 0 }),
+      { expirationTtl: 900 },
+    );
+    try {
+      await sendPasswordResetEmail(c.env, email, code);
+    } catch (err) {
+      console.error('[forgot-password] envio falhou:', err instanceof Error ? err.message : String(err));
+      // Não revela o erro ao cliente; loga para diagnóstico.
+    }
+  }
+  // Resposta genérica sempre.
+  return c.json({ ok: true });
+});
+
+const resetSchema = z.object({
+  email: z.string().email(),
+  code: z.string().min(6).max(6),
+  password: strongPassword,
+});
+
+// Passo 2: validar código e trocar a senha.
+authRoutes.post('/reset-password', zValidator('json', resetSchema), async (c) => {
+  const ip = clientIp(c.req.raw.headers);
+  if (!(await rateLimit(c.env, `reset:${ip}`, 10, 300))) {
+    return c.json({ error: 'rate_limited' }, 429);
+  }
+  const { email, code, password } = c.req.valid('json');
+
+  const raw = await c.env.CACHE.get(`pwreset:${email}`);
+  if (!raw) return c.json({ error: 'invalid_or_expired' }, 400);
+
+  const data = JSON.parse(raw) as { codeHash: string; tries: number };
+  if (data.tries >= 5) {
+    await c.env.CACHE.delete(`pwreset:${email}`);
+    return c.json({ error: 'too_many_attempts' }, 429);
+  }
+
+  const codeHash = await sha256Hex(code);
+  if (codeHash !== data.codeHash) {
+    await c.env.CACHE.put(
+      `pwreset:${email}`,
+      JSON.stringify({ ...data, tries: data.tries + 1 }),
+      { expirationTtl: 900 },
+    );
+    return c.json({ error: 'invalid_code' }, 401);
+  }
+
+  // Código válido: troca a senha.
+  const db = getDb(c.env);
+  const user = await db.select().from(users).where(eq(users.email, email)).get();
+  if (!user) return c.json({ error: 'invalid_or_expired' }, 400);
+
+  const passwordHash = await hashPassword(password);
+  await db.update(users).set({ passwordHash }).where(eq(users.id, user.id));
+  await c.env.CACHE.delete(`pwreset:${email}`);
+
+  await audit(c.env, {
+    clinicId: user.clinicId,
+    actorUserId: user.id,
+    action: 'password_reset',
+    entity: 'user',
+    entityId: user.id,
+  });
+
+  return c.json({ ok: true });
 });
