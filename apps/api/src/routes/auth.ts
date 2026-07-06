@@ -39,6 +39,29 @@ async function readStepToken(env: Env, token: string, purpose: 'setup' | 'challe
   }
 }
 
+// ---- Dispositivo confiável (pula MFA por 15 dias no mesmo navegador) --------
+const TRUSTED_DEVICE_DAYS = 15;
+
+function randomToken(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function trustDevice(env: Env, userId: string): Promise<string> {
+  const token = randomToken();
+  // Chave por usuário+token; expira automaticamente após o prazo.
+  await env.CACHE.put(`trustdev:${userId}:${token}`, '1', {
+    expirationTtl: TRUSTED_DEVICE_DAYS * 24 * 60 * 60,
+  });
+  return token;
+}
+
+async function isTrustedDevice(env: Env, userId: string, token: string): Promise<boolean> {
+  if (!token || token.length < 32) return false;
+  const v = await env.CACHE.get(`trustdev:${userId}:${token}`);
+  return v === '1';
+}
+
 async function issueToken(env: Env, user: UserRow): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   return sign(
@@ -118,6 +141,14 @@ authRoutes.post('/login', zValidator('json', loginSchema), async (c) => {
     const setupToken = await issueStepToken(c.env, user.id, 'setup');
     return c.json({ mfaSetupRequired: true, setupToken });
   }
+
+  // Dispositivo confiável: se o navegador enviou um deviceToken válido, pula o MFA.
+  const deviceToken = c.req.header('X-Device-Token') ?? '';
+  if (deviceToken && (await isTrustedDevice(c.env, user.id, deviceToken))) {
+    const token = await issueToken(c.env, user);
+    return c.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+  }
+
   // MFA ativo: pede o código do app.
   const challengeToken = await issueStepToken(c.env, user.id, 'challenge');
   return c.json({ mfaRequired: true, challengeToken });
@@ -173,7 +204,7 @@ authRoutes.post('/mfa/setup/confirm', zValidator('json', confirmSchema), async (
 });
 
 // ---- MFA: verificar código no login (app ou recuperação) --------------------
-const verifySchema = z.object({ code: z.string().min(6).max(20) });
+const verifySchema = z.object({ code: z.string().min(6).max(20), trustDevice: z.boolean().optional() });
 authRoutes.post('/login/mfa', zValidator('json', verifySchema), async (c) => {
   const ip = clientIp(c.req.raw.headers);
   if (!(await rateLimit(c.env, `mfa:${ip}`, 10, 60))) {
@@ -204,8 +235,12 @@ authRoutes.post('/login/mfa', zValidator('json', verifySchema), async (c) => {
 
   if (!valid) return c.json({ error: 'invalid_code' }, 401);
 
+  const { trustDevice: trust } = c.req.valid('json');
+  let deviceToken: string | undefined;
+  if (trust) deviceToken = await trustDevice(c.env, user.id);
+
   const token = await issueToken(c.env, user);
-  return c.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+  return c.json({ token, deviceToken, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
 });
 
 // ---- Redefinição de senha por e-mail ---------------------------------------
