@@ -44,10 +44,20 @@ function PatientRail({
   const [query, setQuery] = useState('');
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
-  const filtered = useMemo(
-    () => patients.filter((p) => p.fullName.toLowerCase().includes(query.toLowerCase())),
-    [patients, query],
-  );
+  const filtered = useMemo(() => {
+    const q = query.toLowerCase().trim();
+    const onlyDigits = (s: string) => s.replace(/\D/g, '');
+    const qDigits = onlyDigits(query);
+    const list = patients.filter((p) => {
+      if (!q) return true;
+      const nameMatch = p.fullName.toLowerCase().includes(q);
+      // CPF: compara só os dígitos, então funciona com ou sem pontuação.
+      const cpfMatch = qDigits.length >= 3 && p.cpf ? onlyDigits(p.cpf).includes(qDigits) : false;
+      return nameMatch || cpfMatch;
+    });
+    // Ordem alfabética (A→Z), respeitando acentos do português.
+    return list.sort((a, b) => a.fullName.localeCompare(b.fullName, 'pt-BR', { sensitivity: 'base' }));
+  }, [patients, query]);
 
   async function add(e: React.FormEvent) {
     e.preventDefault();
