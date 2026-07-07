@@ -20,6 +20,13 @@ export default function AdminPanel({ onLogout, onViewClinic }: { onLogout: () =>
   const [searchClinics, setSearchClinics] = useState<{ id: string; name: string; isActive: boolean }[]>([]);
   const [searching, setSearching] = useState(false);
 
+  // Modal de apagar clínica (destrutivo)
+  const [deleting, setDeleting] = useState<AdminClinic | null>(null);
+  const [delName, setDelName] = useState('');
+  const [delCode, setDelCode] = useState('');
+  const [delBusy, setDelBusy] = useState(false);
+  const [delErr, setDelErr] = useState('');
+
   async function load() {
     setLoading(true);
     try {
@@ -126,6 +133,41 @@ export default function AdminPanel({ onLogout, onViewClinic }: { onLogout: () =>
       if (selected?.id === clinic.id) setSelected({ ...clinic, isActive: next });
     } catch {
       setMsg(t('admin.actionError'));
+    }
+  }
+
+  function openDelete(clinic: AdminClinic) {
+    setDeleting(clinic);
+    setDelName('');
+    setDelCode('');
+    setDelErr('');
+  }
+
+  async function confirmDelete() {
+    if (!deleting) return;
+    setDelBusy(true);
+    setDelErr('');
+    try {
+      await api.adminDeleteClinic(deleting.id, delName.trim(), delCode.trim());
+      const name = deleting.name;
+      setDeleting(null);
+      if (selected?.id === deleting.id) {
+        setSelected(null);
+        setUsers([]);
+      }
+      setMsg(t('admin.clinicDeleted').replace('{name}', name));
+      load();
+    } catch (e) {
+      const code = e instanceof Error ? e.message : 'generic';
+      const map: Record<string, string> = {
+        name_mismatch: 'admin.delErrName',
+        invalid_mfa: 'admin.delErrMfa',
+        admin_mfa_required: 'admin.delErrAdminMfa',
+        clinic_has_admin: 'admin.delErrHasAdmin',
+      };
+      setDelErr(t(map[code] ?? 'admin.actionError'));
+    } finally {
+      setDelBusy(false);
     }
   }
 
@@ -264,6 +306,9 @@ export default function AdminPanel({ onLogout, onViewClinic }: { onLogout: () =>
                     >
                       {selected.isActive ? t('admin.deactivate') : t('admin.activate')}
                     </button>
+                    <button className="btn-danger-outline sm" onClick={() => openDelete(selected)}>
+                      {t('admin.deleteClinic')}
+                    </button>
                   </div>
                 </div>
                 {selected.status && (
@@ -301,6 +346,58 @@ export default function AdminPanel({ onLogout, onViewClinic }: { onLogout: () =>
 
         <p className="admin-privacy">{t('admin.privacyNote')}</p>
       </div>
+
+      {deleting && (
+        <div className="admin-modal-overlay" onClick={() => !delBusy && setDeleting(null)}>
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+            <h2 className="admin-modal-title danger">⚠️ {t('admin.deleteClinic')}</h2>
+            <p className="admin-modal-warn">
+              {t('admin.deleteWarn').replace('{name}', deleting.name)}
+            </p>
+            <ul className="admin-modal-list">
+              <li>{deleting.users} {t('admin.usersShort')}</li>
+              <li>{deleting.patients} {t('admin.patientsShort')} {t('admin.deleteWithData')}</li>
+            </ul>
+            <p className="admin-modal-irrev">{t('admin.deleteIrreversible')}</p>
+
+            <label className="admin-modal-label">
+              {t('admin.deleteTypeName').replace('{name}', deleting.name)}
+            </label>
+            <input
+              className="admin-modal-input"
+              value={delName}
+              onChange={(e) => setDelName(e.target.value)}
+              placeholder={deleting.name}
+              autoFocus
+            />
+
+            <label className="admin-modal-label">{t('admin.deleteMfaLabel')}</label>
+            <input
+              className="admin-modal-input"
+              value={delCode}
+              onChange={(e) => setDelCode(e.target.value.replace(/\s/g, ''))}
+              placeholder="000000"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+            />
+
+            {delErr && <div className="admin-modal-error">{delErr}</div>}
+
+            <div className="admin-modal-actions">
+              <button className="ghost sm" onClick={() => setDeleting(null)} disabled={delBusy}>
+                {t('btn.cancel')}
+              </button>
+              <button
+                className="btn-danger sm"
+                onClick={confirmDelete}
+                disabled={delBusy || delName.trim() !== deleting.name.trim() || delCode.trim().length < 6}
+              >
+                {delBusy ? t('admin.loading') : t('admin.deleteConfirmBtn')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

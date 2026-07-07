@@ -875,3 +875,39 @@ body { line-height: 1.55; letter-spacing: -0.005em; }
 
 /* Aviso de teste grátis no cadastro */
 .trial-notice { background: linear-gradient(135deg, var(--orange-tint), rgba(245,130,31,0.05)); border: 1px solid rgba(245,130,31,0.3); color: var(--orange-deep); font-size: 13px; font-weight: 500; text-align: center; padding: 10px 14px; border-radius: var(--radius-sm); margin-bottom: 12px; }
+
+/* --- Apagar clínica: botão contornado + modal destrutivo -------------------- */
+.btn-danger-outline {
+  border: 1px solid var(--danger); background: transparent; color: var(--danger);
+  border-radius: var(--radius-sm); padding: 9px 14px; font-size: 14px; font-weight: 600;
+  cursor: pointer; transition: background 0.15s ease, color 0.15s ease;
+}
+.btn-danger-outline:hover { background: var(--danger); color: #fff; }
+
+.admin-modal-overlay {
+  position: fixed; inset: 0; background: rgba(16, 26, 64, 0.55);
+  display: grid; place-items: center; z-index: 1000; padding: 20px;
+  backdrop-filter: blur(2px);
+}
+.admin-modal {
+  background: var(--surface); border-radius: var(--radius); padding: 26px;
+  max-width: 460px; width: 100%; box-shadow: var(--shadow-lg);
+  border-top: 4px solid var(--danger);
+}
+.admin-modal-title { font-family: 'Montserrat', system-ui, sans-serif; font-size: 19px; margin: 0 0 12px; }
+.admin-modal-title.danger { color: var(--danger); }
+.admin-modal-warn { font-size: 14.5px; line-height: 1.55; color: var(--ink); margin: 0 0 10px; font-weight: 600; }
+.admin-modal-list { margin: 0 0 12px; padding-left: 20px; font-size: 13.5px; color: var(--ink-soft, #555); line-height: 1.6; }
+.admin-modal-irrev { font-size: 13px; line-height: 1.5; color: var(--danger); margin: 0 0 18px; }
+.admin-modal-label { display: block; font-size: 13px; font-weight: 600; color: var(--ink); margin: 0 0 6px; }
+.admin-modal-input {
+  width: 100%; padding: 10px 12px; border: 1px solid var(--border, #d5d9e0); border-radius: var(--radius-sm);
+  font-size: 14px; margin: 0 0 14px; box-sizing: border-box; background: #fff; color: var(--ink);
+}
+.admin-modal-input:focus { outline: none; border-color: var(--navy); box-shadow: 0 0 0 3px var(--navy-tint); }
+.admin-modal-error {
+  background: rgba(192, 57, 43, 0.08); color: var(--danger); font-size: 13px;
+  padding: 9px 12px; border-radius: var(--radius-sm); margin: 0 0 14px;
+}
+.admin-modal-actions { display: flex; justify-content: flex-end; gap: 10px; align-items: center; }
+.admin-modal-actions .ghost.sm { width: auto; }
