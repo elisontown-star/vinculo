@@ -692,34 +692,39 @@ patientRoutes.post('/ana-chat', blockSecretary, zValidator('json', chatSchema), 
     );
   }
 
+  // 1) Paciente aberto no momento (se houver).
   if (patientId) {
-    // Paciente aberto no momento.
     const row = await findPatient(c, user, patientId);
     if (row) {
       patientContext =
         '\n\nCONTEXTO DO PACIENTE EM ATENDIMENTO (use quando a pergunta for sobre "este paciente"):\n' +
         (await contextFor(row));
     }
-  } else {
-    // Nenhum paciente aberto: tenta identificar um nome citado na última mensagem.
+  }
+
+  // 2) Além do paciente aberto, procura um nome citado na última mensagem —
+  //    respeitando a visibilidade (só os pacientes que este usuário pode ver).
+  {
     const lastUser = [...messages].reverse().find((m) => m.role === 'user')?.content ?? '';
     const norm = (s: string) =>
       s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     const q = norm(lastUser);
     if (q.length > 2) {
+      const vis = visibilityFilter(user);
       const all = await getDb(c.env)
         .select()
         .from(patients)
-        .where(and(eq(patients.clinicId, user.clinicId), isNull(patients.deletedAt)))
+        .where(and(eq(patients.clinicId, user.clinicId), isNull(patients.deletedAt), vis))
         .all();
       // Casa se qualquer parte do nome (>=3 letras) aparece na mensagem.
       const match = all.find((pt) => {
+        if (pt.id === patientId) return false; // já é o paciente aberto
         const full = norm(pt.fullName);
         if (q.includes(full)) return true;
         return full.split(/\s+/).some((part) => part.length >= 3 && q.includes(part));
       });
       if (match) {
-        patientContext =
+        patientContext +=
           `\n\nCONTEXTO DO PACIENTE "${match.fullName}" (citado na pergunta):\n` +
           (await contextFor(match));
       }
@@ -729,10 +734,12 @@ patientRoutes.post('/ana-chat', blockSecretary, zValidator('json', chatSchema), 
   const system =
     ANA_PERSONA +
     '\n\nCONTEXTO DE USO: você está num CHAT com o psicólogo. Adapte a extensão da resposta à pergunta. ' +
+    'Mantenha um tom gentil e educado, mas seja breve — em conversas normais, responda em poucas frases, de forma calorosa e direta. ' +
     'Para perguntas pontuais (ex.: "qual a queixa principal?", "resuma a última sessão"), responda de forma direta e objetiva, sem a estrutura completa. ' +
     'Quando o psicólogo pedir uma ANÁLISE DO CASO, um panorama geral ou um resumo completo do paciente, use a estrutura detalhada abaixo.\n\n' +
     ANA_FULL_ANALYSIS +
-    '\n\nResponda sempre em português do Brasil. Se a informação pedida não estiver no contexto, diga que não consta nos registros — nunca invente.' +
+    '\n\nResponda sempre em português do Brasil. Se a informação pedida não estiver no contexto, diga que não consta nos registros — nunca invente. ' +
+    'Você pode receber o contexto de mais de um paciente (o que está em atendimento e outro que o psicólogo citou pelo nome). Use o contexto do paciente sobre o qual a pergunta se refere.' +
     patientContext;
 
   let answer = '';
