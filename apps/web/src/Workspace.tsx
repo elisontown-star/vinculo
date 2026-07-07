@@ -42,6 +42,7 @@ function PatientRail({
 }) {
   const { t } = useI18n();
   const [query, setQuery] = useState('');
+  const [sortBy, setSortBy] = useState<'az' | 'za' | 'recent'>('az');
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const filtered = useMemo(() => {
@@ -55,9 +56,14 @@ function PatientRail({
       const cpfMatch = qDigits.length >= 3 && p.cpf ? onlyDigits(p.cpf).includes(qDigits) : false;
       return nameMatch || cpfMatch;
     });
-    // Ordem alfabética (A→Z), respeitando acentos do português.
-    return list.sort((a, b) => a.fullName.localeCompare(b.fullName, 'pt-BR', { sensitivity: 'base' }));
-  }, [patients, query]);
+    // Ordenação escolhida pelo usuário.
+    const byName = (a: typeof list[number], b: typeof list[number]) =>
+      a.fullName.localeCompare(b.fullName, 'pt-BR', { sensitivity: 'base' });
+    if (sortBy === 'az') list.sort(byName);
+    else if (sortBy === 'za') list.sort((a, b) => byName(b, a));
+    else list.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0)); // mais recentes
+    return list;
+  }, [patients, query, sortBy]);
 
   async function add(e: React.FormEvent) {
     e.preventDefault();
@@ -78,6 +84,14 @@ function PatientRail({
         <span className="count">{patients.length}</span>
       </div>
       <input className="rail-search" placeholder={t('rail.search')} value={query} onChange={(e) => setQuery(e.target.value)} />
+      <div className="rail-sort">
+        <span className="rail-sort-label">{t('rail.sortBy')}</span>
+        <select className="rail-sort-select" value={sortBy} onChange={(e) => setSortBy(e.target.value as any)}>
+          <option value="az">{t('rail.sortAz')}</option>
+          <option value="za">{t('rail.sortZa')}</option>
+          <option value="recent">{t('rail.sortRecent')}</option>
+        </select>
+      </div>
       <div className="rail-list">
         {filtered.length === 0 ? (
           <p className="rail-empty">{t('rail.none')}</p>
