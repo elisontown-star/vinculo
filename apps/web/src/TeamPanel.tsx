@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, type TeamMember } from './lib/api';
 import { useI18n } from './i18n';
+import { IconLock, IconCheck, IconClock } from './icons';
 
 export default function TeamPanel({ onClose }: { onClose: () => void }) {
   const { t, te } = useI18n();
@@ -111,7 +112,13 @@ export default function TeamPanel({ onClose }: { onClose: () => void }) {
                   <div className="team-member-name">{m.name} <span className="admin-role">{m.role}</span></div>
                   <div className="team-member-email">{m.email}</div>
                   <div className="team-member-flags">
-                    {m.isActive ? (m.mfaEnabled ? '🔒 ' + t('team.activeMfa') : '✓ ' + t('team.active')) : '⏳ ' + t('team.pending')}
+                    {m.isActive ? (
+                      m.mfaEnabled
+                        ? <span className="flag ok"><IconLock size={13} /> {t('team.activeMfa')}</span>
+                        : <span className="flag ok"><IconCheck size={13} /> {t('team.active')}</span>
+                    ) : (
+                      <span className="flag warn"><IconClock size={13} /> {t('team.pending')}</span>
+                    )}
                   </div>
                 </div>
                 {m.role !== 'owner' && (

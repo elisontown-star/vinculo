@@ -911,3 +911,19 @@ body { line-height: 1.55; letter-spacing: -0.005em; }
 }
 .admin-modal-actions { display: flex; justify-content: flex-end; gap: 10px; align-items: center; }
 .admin-modal-actions .ghost.sm { width: auto; }
+
+/* --- Ícones de linha (set consistente, estilo Fluent) ---------------------- */
+.icon { display: inline-block; vertical-align: -0.18em; flex: 0 0 auto; }
+
+/* Selos de status com ícone + texto (MFA, equipe) */
+.flag { display: inline-flex; align-items: center; gap: 4px; }
+.flag.ok { color: #1a7a43; }
+.flag.warn { color: #b36b00; }
+[data-theme='dark'] .flag.ok { color: #6fdd9f; }
+[data-theme='dark'] .flag.warn { color: #f0b761; }
+
+/* Contêineres que passam a alinhar ícone + rótulo */
+.admin-plan-status { display: flex; align-items: center; gap: 7px; }
+.admin-modal-title { display: flex; align-items: center; gap: 8px; }
+.pill { display: inline-flex; align-items: center; gap: 4px; }
+.admin-tag { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; }
