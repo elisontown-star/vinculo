@@ -96,6 +96,7 @@ function PatientRail({
 export default function Workspace({ onLogout, onBackToAdmin }: { onLogout: () => void; onBackToAdmin?: () => void }) {
   const { t, te, lang } = useI18n();
   const user = getUser();
+  const isSecretary = user?.role === 'secretary';
   const [patients, setPatients] = useState<Patient[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [patient, setPatient] = useState<Patient | null>(null);
@@ -103,7 +104,7 @@ export default function Workspace({ onLogout, onBackToAdmin }: { onLogout: () =>
   const [events, setEvents] = useState<TimelineEvent[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(false);
   const [loadingEvents, setLoadingEvents] = useState(false);
-  const [tab, setTab] = useState<Tab>('consulta');
+  const [tab, setTab] = useState<Tab>(getUser()?.role === 'secretary' ? 'dados' : 'consulta');
   const [error, setError] = useState('');
 
   const fmtDate = (ms: number) => new Date(ms).toLocaleDateString(LOCALE[lang], { day: '2-digit', month: 'short', year: 'numeric' });
@@ -290,12 +291,16 @@ export default function Workspace({ onLogout, onBackToAdmin }: { onLogout: () =>
 
             <nav className="tabs">
               <button className={tab === 'dados' ? 'on' : ''} onClick={() => setTab('dados')}>{t('tab.dados')}</button>
-              <button className={tab === 'consulta' ? 'on' : ''} onClick={() => setTab('consulta')}>{t('tab.consulta')}</button>
-              <button className={tab === 'ficha' ? 'on' : ''} onClick={() => setTab('ficha')}>{t('tab.ficha')}</button>
-              <button className={tab === 'timeline' ? 'on' : ''} onClick={() => setTab('timeline')}>{t('tab.timeline')}</button>
-              <button className={`tab-ana ${tab === 'ana' ? 'on' : ''}`} onClick={() => setTab('ana')}>
-                <span className="tab-ana-spark">✨</span> {t('tab.ana')}
-              </button>
+              {!isSecretary && (
+                <>
+                  <button className={tab === 'consulta' ? 'on' : ''} onClick={() => setTab('consulta')}>{t('tab.consulta')}</button>
+                  <button className={tab === 'ficha' ? 'on' : ''} onClick={() => setTab('ficha')}>{t('tab.ficha')}</button>
+                  <button className={tab === 'timeline' ? 'on' : ''} onClick={() => setTab('timeline')}>{t('tab.timeline')}</button>
+                  <button className={`tab-ana ${tab === 'ana' ? 'on' : ''}`} onClick={() => setTab('ana')}>
+                    <span className="tab-ana-spark">✨</span> {t('tab.ana')}
+                  </button>
+                </>
+              )}
             </nav>
 
             <div className="tab-body">
@@ -395,7 +400,7 @@ export default function Workspace({ onLogout, onBackToAdmin }: { onLogout: () =>
 
       {showTeam && <TeamPanel onClose={() => setShowTeam(false)} />}
 
-      <AnaChat patientId={selectedId ?? undefined} />
+      {!isSecretary && <AnaChat patientId={selectedId ?? undefined} />}
     </>
   );
 }

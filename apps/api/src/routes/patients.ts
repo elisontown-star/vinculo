@@ -32,6 +32,28 @@ function serializePatient(p: PatientRow, withProfile = true) {
   return { ...base, profile: p.profile ? JSON.parse(p.profile) : {} };
 }
 
+// Chaves do profile consideradas clínicas (sigilo) — a secretária NÃO acessa.
+const CLINICAL_KEYS = ['clinical', 'health', 'family', 'financial', 'interests', 'lifestyle', 'personality', 'relationships'];
+
+// Para a secretária: mantém dados cadastrais (personal), remove os clínicos.
+function stripClinical(serialized: any) {
+  if (!serialized.profile) return serialized;
+  const p = { ...serialized.profile };
+  for (const k of CLINICAL_KEYS) delete p[k];
+  return { ...serialized, profile: p };
+}
+
+function isSecretary(user: { role: string }) {
+  return user.role === 'secretary';
+}
+
+// Middleware: bloqueia a secretária em rotas clínicas (sigilo do prontuário).
+async function blockSecretary(c: any, next: any) {
+  const user = c.get('user');
+  if (isSecretary(user)) return c.json({ error: 'forbidden_clinical' }, 403);
+  await next();
+}
+
 type SessionRow = typeof sessions.$inferSelect;
 function serializeSession(s: SessionRow) {
   return { ...s, topics: s.topics ? (JSON.parse(s.topics) as string[]) : [] };
@@ -133,7 +155,8 @@ patientRoutes.get('/:id', async (c) => {
   const user = c.get('user');
   const row = await findPatient(c, user, c.req.param('id'));
   if (!row) return c.json({ error: 'not_found' }, 404);
-  return c.json({ patient: serializePatient(row) });
+  const serialized = serializePatient(row);
+  return c.json({ patient: isSecretary(user) ? stripClinical(serialized) : serialized });
 });
 
 // Atualização da ficha (parcial — tudo opcional).
@@ -144,7 +167,18 @@ patientRoutes.patch('/:id', zValidator('json', updateSchema), async (c) => {
   const id = c.req.param('id');
   const existing = await findPatient(c, user, id);
   if (!existing) return c.json({ error: 'not_found' }, 404);
-  const values = patientValues(c.req.valid('json'));
+  const input = c.req.valid('json');
+  // Secretária não pode gravar dados clínicos: preserva o profile clínico existente.
+  if (isSecretary(user) && input.profile) {
+    const current = existing.profile ? JSON.parse(existing.profile) : {};
+    const incoming = { ...input.profile };
+    for (const k of CLINICAL_KEYS) {
+      if (current[k] !== undefined) incoming[k] = current[k];
+      else delete incoming[k];
+    }
+    input.profile = incoming;
+  }
+  const values = patientValues(input);
   const db = getDb(c.env);
   const row = await db
     .update(patients)
@@ -163,7 +197,7 @@ patientRoutes.patch('/:id', zValidator('json', updateSchema), async (c) => {
 });
 
 // ---- Consultas -----------------------------------------------------------
-patientRoutes.get('/:id/sessions', async (c) => {
+patientRoutes.get('/:id/sessions', blockSecretary, async (c) => {
   const user = c.get('user');
   const id = c.req.param('id');
   if (!(await findPatient(c, user, id))) return c.json({ error: 'not_found' }, 404);
@@ -189,7 +223,7 @@ const sessionSchema = z.object({
   freeNotes: z.string().optional(),
 });
 
-patientRoutes.post('/:id/sessions', zValidator('json', sessionSchema), async (c) => {
+patientRoutes.post('/:id/sessions', blockSecretary, zValidator('json', sessionSchema), async (c) => {
   const user = c.get('user');
   const id = c.req.param('id');
   if (!(await findPatient(c, user, id))) return c.json({ error: 'not_found' }, 404);
@@ -227,7 +261,7 @@ patientRoutes.post('/:id/sessions', zValidator('json', sessionSchema), async (c)
 
 // ---- Linha do tempo ------------------------------------------------------
 // Entradas manuais agora; a IA vai sugerir eventos (status "suggested") na Etapa 2.
-patientRoutes.get('/:id/timeline', async (c) => {
+patientRoutes.get('/:id/timeline', blockSecretary, async (c) => {
   const user = c.get('user');
   const id = c.req.param('id');
   if (!(await findPatient(c, user, id))) return c.json({ error: 'not_found' }, 404);
@@ -248,7 +282,7 @@ const eventSchema = z.object({
   category: z.string().optional(),
 });
 
-patientRoutes.post('/:id/timeline', zValidator('json', eventSchema), async (c) => {
+patientRoutes.post('/:id/timeline', blockSecretary, zValidator('json', eventSchema), async (c) => {
   const user = c.get('user');
   const id = c.req.param('id');
   if (!(await findPatient(c, user, id))) return c.json({ error: 'not_found' }, 404);
@@ -450,7 +484,7 @@ function buildPatientContext(patient: any, sess: any[], events: any[]): string {
   return parts.join('\n');
 }
 
-patientRoutes.get('/:id/ai-questions', async (c) => {
+patientRoutes.get('/:id/ai-questions', blockSecretary, async (c) => {
   const user = c.get('user');
   const id = c.req.param('id');
   const patientRow = await findPatient(c, user, id);
@@ -628,7 +662,7 @@ const chatSchema = z.object({
     .max(20),
 });
 
-patientRoutes.post('/ana-chat', zValidator('json', chatSchema), async (c) => {
+patientRoutes.post('/ana-chat', blockSecretary, zValidator('json', chatSchema), async (c) => {
   console.log('[ana-chat] rota alcançada');
   try {
   const user = c.get('user');

@@ -9,6 +9,7 @@ export default function TeamPanel({ onClose }: { onClose: () => void }) {
   const [showInvite, setShowInvite] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [role, setRole] = useState('psychologist');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
@@ -31,9 +32,9 @@ export default function TeamPanel({ onClose }: { onClose: () => void }) {
     setError('');
     setBusy(true);
     try {
-      const r = await api.teamInvite({ name, email });
+      const r = await api.teamInvite({ name, email, role });
       setMsg(r.emailSent ? t('team.inviteSent').replace('{email}', email) : t('team.inviteNoEmail'));
-      setName(''); setEmail(''); setShowInvite(false);
+      setName(''); setEmail(''); setRole('psychologist'); setShowInvite(false);
       load();
     } catch (err) {
       setError(te(err instanceof Error ? err.message : 'generic'));
@@ -84,6 +85,14 @@ export default function TeamPanel({ onClose }: { onClose: () => void }) {
             <div className="field">
               <label>{t('lbl.email')}</label>
               <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            </div>
+            <div className="field">
+              <label>{t('team.role')}</label>
+              <select value={role} onChange={(e) => setRole(e.target.value)}>
+                <option value="psychologist">{t('team.rolePsychologist')}</option>
+                <option value="secretary">{t('team.roleSecretary')}</option>
+                <option value="owner">{t('team.roleOwner')}</option>
+              </select>
             </div>
             <div className="team-invite-actions">
               <button type="button" className="ghost sm" onClick={() => setShowInvite(false)}>{t('btn.cancel')}</button>

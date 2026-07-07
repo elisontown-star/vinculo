@@ -40,7 +40,7 @@ teamRoutes.get('/', requireAuth, requireRole('owner'), async (c) => {
 const inviteSchema = z.object({
   name: z.string().min(2),
   email: z.string().email(),
-  role: z.enum(['psychologist', 'secretary']).default('psychologist'),
+  role: z.enum(['psychologist', 'secretary', 'owner']).default('psychologist'),
 });
 
 teamRoutes.post('/invite', requireAuth, requireRole('owner'), zValidator('json', inviteSchema), async (c) => {
