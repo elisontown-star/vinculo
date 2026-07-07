@@ -43,6 +43,7 @@ function PatientRail({
   const { t } = useI18n();
   const [query, setQuery] = useState('');
   const [sortBy, setSortBy] = useState<'az' | 'za' | 'recent'>('az');
+  const [sortMenu, setSortMenu] = useState(false);
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const filtered = useMemo(() => {
@@ -83,14 +84,36 @@ function PatientRail({
         <span className="rail-title">{t('rail.patients')}</span>
         <span className="count">{patients.length}</span>
       </div>
-      <input className="rail-search" placeholder={t('rail.search')} value={query} onChange={(e) => setQuery(e.target.value)} />
-      <div className="rail-sort">
-        <span className="rail-sort-label">{t('rail.sortBy')}</span>
-        <select className="rail-sort-select" value={sortBy} onChange={(e) => setSortBy(e.target.value as any)}>
-          <option value="az">{t('rail.sortAz')}</option>
-          <option value="za">{t('rail.sortZa')}</option>
-          <option value="recent">{t('rail.sortRecent')}</option>
-        </select>
+      <div className="rail-search-row">
+        <input className="rail-search" placeholder={t('rail.search')} value={query} onChange={(e) => setQuery(e.target.value)} />
+        <div className="rail-sort-wrap">
+          <button
+            className={`rail-sort-btn ${sortMenu ? 'on' : ''}`}
+            onClick={() => setSortMenu((v) => !v)}
+            title={t('rail.sortBy')}
+            aria-label={t('rail.sortBy')}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="4" y1="6" x2="20" y2="6" /><line x1="7" y1="12" x2="17" y2="12" /><line x1="10" y1="18" x2="14" y2="18" />
+            </svg>
+          </button>
+          {sortMenu && (
+            <>
+              <div className="rail-sort-backdrop" onClick={() => setSortMenu(false)} />
+              <div className="rail-sort-menu">
+                {(['az', 'za', 'recent'] as const).map((opt) => (
+                  <button
+                    key={opt}
+                    className={sortBy === opt ? 'sel' : ''}
+                    onClick={() => { setSortBy(opt); setSortMenu(false); }}
+                  >
+                    {t(opt === 'az' ? 'rail.sortAz' : opt === 'za' ? 'rail.sortZa' : 'rail.sortRecent')}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
       </div>
       <div className="rail-list">
         {filtered.length === 0 ? (
