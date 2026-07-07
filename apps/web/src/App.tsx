@@ -259,6 +259,9 @@ function Auth({ onDone }: { onDone: () => void }) {
                 <li className={/[^A-Za-z0-9]/.test(password) ? 'ok' : ''}>{t('pw.special')}</li>
               </ul>
             )}
+            {mode === 'register' && (
+              <div className="trial-notice">🎁 {t('auth.trialNotice')}</div>
+            )}
             <button className="btn" disabled={busy}>
               {busy ? t('btn.wait') : mode === 'register' ? t('btn.createClinic') : t('btn.enter')}
             </button>
