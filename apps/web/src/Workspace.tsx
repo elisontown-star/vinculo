@@ -42,12 +42,29 @@ function PatientRail({
 }) {
   const { t } = useI18n();
   const [query, setQuery] = useState('');
+  const [sortBy, setSortBy] = useState<'az' | 'za' | 'recent'>('az');
+  const [sortMenu, setSortMenu] = useState(false);
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
-  const filtered = useMemo(
-    () => patients.filter((p) => p.fullName.toLowerCase().includes(query.toLowerCase())),
-    [patients, query],
-  );
+  const filtered = useMemo(() => {
+    const q = query.toLowerCase().trim();
+    const onlyDigits = (s: string) => s.replace(/\D/g, '');
+    const qDigits = onlyDigits(query);
+    const list = patients.filter((p) => {
+      if (!q) return true;
+      const nameMatch = p.fullName.toLowerCase().includes(q);
+      // CPF: compara só os dígitos, então funciona com ou sem pontuação.
+      const cpfMatch = qDigits.length >= 3 && p.cpf ? onlyDigits(p.cpf).includes(qDigits) : false;
+      return nameMatch || cpfMatch;
+    });
+    // Ordenação escolhida pelo usuário.
+    const byName = (a: typeof list[number], b: typeof list[number]) =>
+      a.fullName.localeCompare(b.fullName, 'pt-BR', { sensitivity: 'base' });
+    if (sortBy === 'az') list.sort(byName);
+    else if (sortBy === 'za') list.sort((a, b) => byName(b, a));
+    else list.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0)); // mais recentes
+    return list;
+  }, [patients, query, sortBy]);
 
   async function add(e: React.FormEvent) {
     e.preventDefault();
@@ -67,7 +84,37 @@ function PatientRail({
         <span className="rail-title">{t('rail.patients')}</span>
         <span className="count">{patients.length}</span>
       </div>
-      <input className="rail-search" placeholder={t('rail.search')} value={query} onChange={(e) => setQuery(e.target.value)} />
+      <div className="rail-search-row">
+        <input className="rail-search" placeholder={t('rail.search')} value={query} onChange={(e) => setQuery(e.target.value)} />
+        <div className="rail-sort-wrap">
+          <button
+            className={`rail-sort-btn ${sortMenu ? 'on' : ''}`}
+            onClick={() => setSortMenu((v) => !v)}
+            title={t('rail.sortBy')}
+            aria-label={t('rail.sortBy')}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="4" y1="6" x2="20" y2="6" /><line x1="7" y1="12" x2="17" y2="12" /><line x1="10" y1="18" x2="14" y2="18" />
+            </svg>
+          </button>
+          {sortMenu && (
+            <>
+              <div className="rail-sort-backdrop" onClick={() => setSortMenu(false)} />
+              <div className="rail-sort-menu">
+                {(['az', 'za', 'recent'] as const).map((opt) => (
+                  <button
+                    key={opt}
+                    className={sortBy === opt ? 'sel' : ''}
+                    onClick={() => { setSortBy(opt); setSortMenu(false); }}
+                  >
+                    {t(opt === 'az' ? 'rail.sortAz' : opt === 'za' ? 'rail.sortZa' : 'rail.sortRecent')}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
       <div className="rail-list">
         {filtered.length === 0 ? (
           <p className="rail-empty">{t('rail.none')}</p>

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { and, eq, desc, asc, isNull, isNotNull } from 'drizzle-orm';
 import { getDb } from '../lib/db';
 import { patients, sessions, timelineEvents } from '@vinculo/db/schema';
+import { ANA_PERSONA, ANA_FULL_ANALYSIS } from '../lib/anaPrompt';
 import { requireAuth } from '../middleware/auth';
 import { audit } from '../lib/audit';
 import type { AppBindings, AuthUser } from '../types';
@@ -520,10 +521,10 @@ patientRoutes.get('/:id/ai-questions', blockSecretary, async (c) => {
 
   const context = buildPatientContext(patient, sess, eventRows);
   const system =
-    'Você é a Ana Luiza, assistente de um psicólogo. A partir das informações do ' +
-    'paciente, sugira de 4 a 6 perguntas abertas, empáticas e clinicamente úteis ' +
-    'que o psicólogo pode fazer na PRÓXIMA sessão, dando continuidade ao processo. ' +
-    'Você observa e sugere, NUNCA diagnostica. Não use jargão excessivo. ' +
+    ANA_PERSONA +
+    '\n\nTAREFA: a partir das informações do paciente, gere de 10 a 20 perguntas ABERTAS, ' +
+    'empáticas e clinicamente úteis que o psicólogo pode fazer na PRÓXIMA sessão, dando ' +
+    'continuidade ao processo terapêutico. Evite perguntas fechadas (de sim/não). ' +
     'Cada pergunta em uma linha, começando com "- ". Não escreva mais nada além das perguntas.';
 
   function parseQuestions(text: string): string[] {
@@ -558,7 +559,7 @@ patientRoutes.get('/:id/ai-questions', blockSecretary, async (c) => {
         { role: 'system', content: system },
         { role: 'user', content: context },
       ],
-      max_tokens: 600,
+      max_tokens: 1000,
       temperature: 0.6,
     });
     const text: string = (res?.response ?? '').toString().trim();
@@ -691,34 +692,39 @@ patientRoutes.post('/ana-chat', blockSecretary, zValidator('json', chatSchema), 
     );
   }
 
+  // 1) Paciente aberto no momento (se houver).
   if (patientId) {
-    // Paciente aberto no momento.
     const row = await findPatient(c, user, patientId);
     if (row) {
       patientContext =
         '\n\nCONTEXTO DO PACIENTE EM ATENDIMENTO (use quando a pergunta for sobre "este paciente"):\n' +
         (await contextFor(row));
     }
-  } else {
-    // Nenhum paciente aberto: tenta identificar um nome citado na última mensagem.
+  }
+
+  // 2) Além do paciente aberto, procura um nome citado na última mensagem —
+  //    respeitando a visibilidade (só os pacientes que este usuário pode ver).
+  {
     const lastUser = [...messages].reverse().find((m) => m.role === 'user')?.content ?? '';
     const norm = (s: string) =>
       s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     const q = norm(lastUser);
     if (q.length > 2) {
+      const vis = visibilityFilter(user);
       const all = await getDb(c.env)
         .select()
         .from(patients)
-        .where(and(eq(patients.clinicId, user.clinicId), isNull(patients.deletedAt)))
+        .where(and(eq(patients.clinicId, user.clinicId), isNull(patients.deletedAt), vis))
         .all();
       // Casa se qualquer parte do nome (>=3 letras) aparece na mensagem.
       const match = all.find((pt) => {
+        if (pt.id === patientId) return false; // já é o paciente aberto
         const full = norm(pt.fullName);
         if (q.includes(full)) return true;
         return full.split(/\s+/).some((part) => part.length >= 3 && q.includes(part));
       });
       if (match) {
-        patientContext =
+        patientContext +=
           `\n\nCONTEXTO DO PACIENTE "${match.fullName}" (citado na pergunta):\n` +
           (await contextFor(match));
       }
@@ -726,21 +732,21 @@ patientRoutes.post('/ana-chat', blockSecretary, zValidator('json', chatSchema), 
   }
 
   const system =
-    'Você é a Ana Luiza, assistente de IA de um psicólogo dentro do sistema Vínculo. ' +
-    'Ajuda com dúvidas gerais de psicologia clínica E comenta sobre pacientes a partir ' +
-    'dos registros fornecidos no contexto. Quando um contexto de paciente é fornecido, ' +
-    'use os dados dele para responder (idade, ficha, consultas, evolução, etc.). Se a ' +
-    'informação pedida não estiver no contexto, diga que não consta nos registros — ' +
-    'nunca invente. Seja acolhedora, clara e objetiva. Você observa, resume e sugere — ' +
-    'NUNCA dá diagnóstico definitivo nem substitui o julgamento do profissional. ' +
-    'Responda em português do Brasil.' +
+    ANA_PERSONA +
+    '\n\nCONTEXTO DE USO: você está num CHAT com o psicólogo. Adapte a extensão da resposta à pergunta. ' +
+    'Mantenha um tom gentil e educado, mas seja breve — em conversas normais, responda em poucas frases, de forma calorosa e direta. ' +
+    'Para perguntas pontuais (ex.: "qual a queixa principal?", "resuma a última sessão"), responda de forma direta e objetiva, sem a estrutura completa. ' +
+    'Quando o psicólogo pedir uma ANÁLISE DO CASO, um panorama geral ou um resumo completo do paciente, use a estrutura detalhada abaixo.\n\n' +
+    ANA_FULL_ANALYSIS +
+    '\n\nResponda sempre em português do Brasil. Se a informação pedida não estiver no contexto, diga que não consta nos registros — nunca invente. ' +
+    'Você pode receber o contexto de mais de um paciente (o que está em atendimento e outro que o psicólogo citou pelo nome). Use o contexto do paciente sobre o qual a pergunta se refere.' +
     patientContext;
 
   let answer = '';
   try {
     const res: any = await c.env.AI.run('@cf/meta/llama-3.3-70b-instruct-fp8-fast', {
       messages: [{ role: 'system', content: system }, ...messages],
-      max_tokens: 800,
+      max_tokens: 2000,
       temperature: 0.7,
     });
     answer = (res?.response ?? '').toString().trim();

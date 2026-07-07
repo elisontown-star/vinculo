@@ -99,7 +99,13 @@ authRoutes.post('/register', zValidator('json', registerSchema), async (c) => {
   const existing = await db.select().from(users).where(eq(users.email, email)).get();
   if (existing) return c.json({ error: 'email_in_use' }, 409);
 
-  const clinic = await db.insert(clinics).values({ name: clinicName }).returning().get();
+  const TRIAL_DAYS = 7;
+  const trialEndsAt = Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000;
+  const clinic = await db
+    .insert(clinics)
+    .values({ name: clinicName, status: 'trial', trialEndsAt })
+    .returning()
+    .get();
   const passwordHash = await hashPassword(password);
   const user = await db
     .insert(users)
@@ -135,6 +141,21 @@ authRoutes.post('/login', zValidator('json', loginSchema), async (c) => {
 
   const ok = await verifyPassword(password, user.passwordHash);
   if (!ok) return c.json({ error: 'invalid_credentials' }, 401);
+
+  // Verificação de trial/plano da clínica (o platform_admin não pertence a esse ciclo).
+  if (user.role !== 'platform_admin') {
+    const clinic = await db.select().from(clinics).where(eq(clinics.id, user.clinicId)).get();
+    if (clinic) {
+      const expired = clinic.status === 'trial' && clinic.trialEndsAt != null && Date.now() > clinic.trialEndsAt;
+      if (clinic.status === 'blocked' || clinic.isActive === false || expired) {
+        // Marca como bloqueada (se ainda não estiver) para deixar o estado consistente.
+        if (expired && clinic.status === 'trial') {
+          await db.update(clinics).set({ status: 'blocked' }).where(eq(clinics.id, clinic.id));
+        }
+        return c.json({ error: 'clinic_blocked' }, 403);
+      }
+    }
+  }
 
   // MFA obrigatório. Se ainda não configurou, exige setup antes de entrar.
   if (!user.mfaEnabled) {

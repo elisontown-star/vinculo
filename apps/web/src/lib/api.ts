@@ -18,6 +18,8 @@ export type AdminClinic = {
   name: string;
   createdAt: number;
   isActive: boolean;
+  status?: 'trial' | 'active' | 'blocked';
+  trialEndsAt?: number | null;
   users: number;
   patients: number;
 };
@@ -150,6 +152,10 @@ export const api = {
     req(`/admin/users/${userId}/reset-password`, { method: 'POST' }),
   adminToggleClinic: (clinicId: string, isActive: boolean): Promise<{ ok: boolean }> =>
     req(`/admin/clinics/${clinicId}/active`, { method: 'POST', body: JSON.stringify({ isActive }) }),
+  adminActivatePlan: (clinicId: string): Promise<{ ok: boolean }> =>
+    req(`/admin/clinics/${clinicId}/activate-plan`, { method: 'POST' }),
+  adminExtendTrial: (clinicId: string, days: number): Promise<{ ok: boolean }> =>
+    req(`/admin/clinics/${clinicId}/extend-trial`, { method: 'POST', body: JSON.stringify({ days }) }),
   adminSearch: (q: string): Promise<{ users: (AdminUser & { clinicId: string; clinicName: string })[]; clinics: { id: string; name: string; isActive: boolean; createdAt: number }[] }> =>
     req(`/admin/search?q=${encodeURIComponent(q)}`),
 

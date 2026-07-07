@@ -104,6 +104,18 @@ export default function AdminPanel({ onLogout, onViewClinic }: { onLogout: () =>
     }
   }
 
+  async function activatePlan(clinic: AdminClinic) {
+    if (!confirm(t('admin.confirmActivatePlan').replace('{name}', clinic.name))) return;
+    try {
+      await api.adminActivatePlan(clinic.id);
+      setMsg(t('admin.planActivated').replace('{name}', clinic.name));
+      load();
+      setSelected({ ...clinic, status: 'active', isActive: true });
+    } catch {
+      setMsg(t('admin.actionError'));
+    }
+  }
+
   async function toggleClinic(clinic: AdminClinic) {
     const next = !clinic.isActive;
     const key = next ? 'admin.confirmActivate' : 'admin.confirmDeactivate';
@@ -226,7 +238,12 @@ export default function AdminPanel({ onLogout, onViewClinic }: { onLogout: () =>
                   onClick={() => openClinic(cl)}
                 >
                   <div className="admin-clinic-name">{cl.name}{!cl.isActive && <em> · {t('admin.disabled')}</em>}</div>
-                  <div className="admin-clinic-meta">{cl.users} {t('admin.usersShort')} · {cl.patients} {t('admin.patientsShort')}</div>
+                  <div className="admin-clinic-meta">
+                    {cl.users} {t('admin.usersShort')} · {cl.patients} {t('admin.patientsShort')}
+                    {cl.status === 'trial' && <span className="admin-tag trial"> · trial</span>}
+                    {cl.status === 'active' && <span className="admin-tag active"> · plano ativo</span>}
+                    {cl.status === 'blocked' && <span className="admin-tag blocked"> · bloqueada</span>}
+                  </div>
                 </button>
               ))}
             </div>
@@ -237,13 +254,25 @@ export default function AdminPanel({ onLogout, onViewClinic }: { onLogout: () =>
               <>
                 <div className="admin-clinic-head">
                   <h2 className="admin-h2">{selected.name}</h2>
-                  <button
-                    className={selected.isActive ? 'btn-danger sm' : 'btn sm'}
-                    onClick={() => toggleClinic(selected)}
-                  >
-                    {selected.isActive ? t('admin.deactivate') : t('admin.activate')}
-                  </button>
+                  <div className="admin-clinic-head-actions">
+                    {selected.status !== 'active' && (
+                      <button className="btn sm" onClick={() => activatePlan(selected)}>{t('admin.activatePlan')}</button>
+                    )}
+                    <button
+                      className={selected.isActive ? 'btn-danger sm' : 'btn sm'}
+                      onClick={() => toggleClinic(selected)}
+                    >
+                      {selected.isActive ? t('admin.deactivate') : t('admin.activate')}
+                    </button>
+                  </div>
                 </div>
+                {selected.status && (
+                  <div className={`admin-plan-status ${selected.status}`}>
+                    {selected.status === 'trial' && t('admin.statusTrial').replace('{date}', selected.trialEndsAt ? new Date(selected.trialEndsAt).toLocaleDateString('pt-BR') : '—')}
+                    {selected.status === 'active' && t('admin.statusActive')}
+                    {selected.status === 'blocked' && t('admin.statusBlocked')}
+                  </div>
+                )}
                 <div className="admin-list">
                   {users.map((u) => (
                     <div key={u.id} className="admin-user">

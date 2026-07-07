@@ -10,6 +10,10 @@ export const clinics = sqliteTable('clinics', {
   id: id(),
   name: text('name').notNull(),
   isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+  // Ciclo de vida comercial: 'trial' (testando), 'active' (plano pago), 'blocked' (expirado).
+  status: text('status', { enum: ['trial', 'active', 'blocked'] }).notNull().default('trial'),
+  // Fim do período de teste (timestamp ms). Após essa data, se ainda em trial, bloqueia.
+  trialEndsAt: integer('trial_ends_at'),
   createdAt: createdAt(),
 });
 

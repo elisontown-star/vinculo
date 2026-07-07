@@ -39,6 +39,8 @@ adminRoutes.get('/clinics', async (c) => {
       name: clinic.name,
       createdAt: clinic.createdAt,
       isActive: clinic.isActive ?? true,
+      status: clinic.status ?? 'trial',
+      trialEndsAt: clinic.trialEndsAt ?? null,
       users: userCount?.n ?? 0,
       patients: patientCount?.n ?? 0,
     });
@@ -190,6 +192,40 @@ adminRoutes.get('/search', async (c) => {
     })),
     clinics: clinicRows.map((cl) => ({ id: cl.id, name: cl.name, isActive: cl.isActive ?? true, createdAt: cl.createdAt })),
   });
+});
+
+// --- Ativar plano mensal (tira do trial, libera acesso) ----------------------
+adminRoutes.post('/clinics/:id/activate-plan', async (c) => {
+  const clinicId = c.req.param('id');
+  const db = getDb(c.env);
+  const clinic = await db.select().from(clinics).where(eq(clinics.id, clinicId)).get();
+  if (!clinic) return c.json({ error: 'not_found' }, 404);
+
+  await db.update(clinics).set({ status: 'active', isActive: true }).where(eq(clinics.id, clinicId));
+  // Reativa os logins da clínica.
+  await db.update(users).set({ isActive: true }).where(eq(users.clinicId, clinicId));
+
+  const admin = c.get('user');
+  await audit(c.env, { clinicId, actorUserId: admin.userId, action: 'admin_activate_plan', entity: 'clinic', entityId: clinicId });
+  return c.json({ ok: true });
+});
+
+// --- Estender/reiniciar o período de teste (dias a partir de agora) ----------
+const extendSchema = z.object({ days: z.number().int().min(1).max(90) });
+adminRoutes.post('/clinics/:id/extend-trial', zValidator('json', extendSchema), async (c) => {
+  const clinicId = c.req.param('id');
+  const { days } = c.req.valid('json');
+  const db = getDb(c.env);
+  const clinic = await db.select().from(clinics).where(eq(clinics.id, clinicId)).get();
+  if (!clinic) return c.json({ error: 'not_found' }, 404);
+
+  const trialEndsAt = Date.now() + days * 24 * 60 * 60 * 1000;
+  await db.update(clinics).set({ status: 'trial', trialEndsAt, isActive: true }).where(eq(clinics.id, clinicId));
+  await db.update(users).set({ isActive: true }).where(eq(users.clinicId, clinicId));
+
+  const admin = c.get('user');
+  await audit(c.env, { clinicId, actorUserId: admin.userId, action: 'admin_extend_trial', entity: 'clinic', entityId: clinicId });
+  return c.json({ ok: true });
 });
 
 // --- Estatísticas gerais da plataforma --------------------------------------

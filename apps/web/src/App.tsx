@@ -41,6 +41,7 @@ function Auth({ onDone }: { onDone: () => void }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [blocked, setBlocked] = useState(false);
   const [busy, setBusy] = useState(false);
   const [mfaStep, setMfaStep] = useState<null | { kind: 'setup' | 'challenge'; token: string }>(null);
   const resetParams = (() => {
@@ -87,7 +88,12 @@ function Auth({ onDone }: { onDone: () => void }) {
       setUser(res.user);
       onDone();
     } catch (err) {
-      setError(te(err instanceof Error ? err.message : 'generic'));
+      const msg = err instanceof Error ? err.message : 'generic';
+      if (msg === 'clinic_blocked') {
+        setBlocked(true);
+      } else {
+        setError(te(msg));
+      }
     } finally {
       setBusy(false);
     }
@@ -106,6 +112,30 @@ function Auth({ onDone }: { onDone: () => void }) {
         <div className="mfa-center">
           <div className="auth-card">
             <AcceptInvite token={inviteToken} onDone={() => { setShowInvite(false); window.history.replaceState({}, '', '/'); }} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (blocked) {
+    return (
+      <div className="mfa-wrap">
+        <div className="mfa-topbar"><Brand /><Controls /></div>
+        <div className="mfa-center">
+          <div className="auth-card">
+            <div className="fp-box">
+              <div className="blocked-icon">🔒</div>
+              <h1>{t('blocked.title')}</h1>
+              <p className="sub">{t('blocked.sub')}</p>
+              <a className="btn" href="mailto:suporte@vtechit.com.br?subject=Ativação%20de%20plano%20-%20Vínculo">
+                {t('blocked.contact')}
+              </a>
+              <p className="blocked-email">suporte@vtechit.com.br</p>
+              <button className="link-toggle" type="button" onClick={() => { setBlocked(false); setEmail(''); setPassword(''); }}>
+                {t('fp.backToLogin')}
+              </button>
+            </div>
           </div>
         </div>
       </div>

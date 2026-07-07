@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import { api, type Patient, type Session, type TimelineEvent } from '../lib/api';
 import { useI18n } from '../i18n';
+import { AnaFace } from '../anaAvatar';
 import { LOCALE } from '../locales';
 
 function ageFrom(ms?: number | null): number | null {
@@ -113,7 +114,7 @@ export default function AnaLuizaTab({
   return (
     <div className="ana-tab">
       <div className="ana-hero">
-        <div className="ana-avatar">✨</div>
+        <div className="ana-avatar"><AnaFace className="ana-avatar-face" /></div>
         <div className="ana-hero-txt">
           <h3>{t('ana.title')}</h3>
           <p>{t('ana.subtitle')}</p>
