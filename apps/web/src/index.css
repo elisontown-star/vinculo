@@ -471,12 +471,13 @@ input, textarea, select, button { font-family: inherit; }
   border: 1px solid var(--line);
 }
 .ana-chat-head {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 16px; color: #fff;
+  position: relative;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 20px 16px 18px; color: #fff;
   background: linear-gradient(135deg, var(--navy) 0%, var(--navy-2) 100%);
 }
-.ana-chat-title { font-family: 'Montserrat', system-ui, sans-serif; font-weight: 600; font-size: 15px; display: flex; align-items: center; gap: 8px; }
-.ana-chat-close { background: none; border: none; color: #fff; font-size: 24px; cursor: pointer; line-height: 1; opacity: 0.85; }
+.ana-chat-title { font-family: 'Montserrat', system-ui, sans-serif; font-weight: 600; font-size: 16px; }
+.ana-chat-close { position: absolute; top: 12px; right: 14px; background: none; border: none; color: #fff; font-size: 24px; cursor: pointer; line-height: 1; opacity: 0.85; }
 .ana-chat-close:hover { opacity: 1; }
 
 .ana-chat-body { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; background: var(--bg); }
@@ -839,6 +840,6 @@ body { line-height: 1.55; letter-spacing: -0.005em; }
 .ana-avatar:has(.ana-face) { background: none; padding: 0; overflow: hidden; }
 .ana-fab:has(.ana-face) { overflow: hidden; padding: 0; }
 
-/* Rosto da Ana no cabeçalho do chat — pequeno e fixo (evita esticar) */
-.ana-title-face { width: 28px !important; height: 28px !important; border-radius: 50%; object-fit: cover; flex: none; }
-.ana-chat-title .ana-face-emoji { font-size: 18px; }
+/* Rosto da Ana no cabeçalho do chat — centralizado, maior, com anel */
+.ana-title-face { width: 64px !important; height: 64px !important; border-radius: 50%; object-fit: cover; flex: none; border: 2.5px solid rgba(255,255,255,0.9); box-shadow: 0 3px 12px rgba(0,0,0,0.25); }
+.ana-chat-title .ana-face-emoji { font-size: 40px; }
