@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { api } from './lib/api';
 import { useI18n } from './i18n';
+import { AnaFace } from './anaAvatar';
 
 type Msg = { role: 'user' | 'assistant'; content: string };
 
@@ -46,7 +47,7 @@ export default function AnaChat({ patientId }: { patientId?: string }) {
     <>
       {!open && (
         <button className="ana-fab" onClick={() => setOpen(true)} title={t('anaChat.open')}>
-          <span className="ana-fab-spark">✨</span>
+          <AnaFace className="ana-fab-face" />
         </button>
       )}
 
@@ -54,7 +55,7 @@ export default function AnaChat({ patientId }: { patientId?: string }) {
         <div className="ana-chat">
           <div className="ana-chat-head">
             <span className="ana-chat-title">
-              <span className="ana-fab-spark">✨</span> {t('anaChat.title')}
+              <AnaFace className="ana-fab-face" /> {t('anaChat.title')}
             </span>
             <button className="ana-chat-close" onClick={() => setOpen(false)}>×</button>
           </div>

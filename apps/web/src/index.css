@@ -828,3 +828,13 @@ body { line-height: 1.55; letter-spacing: -0.005em; }
 .team-member-email { font-size: 12.5px; color: var(--muted); }
 .team-member-flags { font-size: 12px; color: var(--muted); margin-top: 2px; }
 .team-member-actions { display: flex; gap: 6px; flex: none; }
+
+/* Rosto da Ana Luiza (imagem) — preenche os círculos de avatar */
+.ana-face { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; }
+.ana-fab .ana-face { width: 100%; height: 100%; }
+.ana-fab-face { border-radius: 50%; }
+.ana-avatar .ana-face-emoji, .ana-fab .ana-face-emoji { font-size: inherit; }
+.ana-avatar-face { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+/* Quando for imagem, o container do avatar não precisa de fundo/emoji */
+.ana-avatar:has(.ana-face) { background: none; padding: 0; overflow: hidden; }
+.ana-fab:has(.ana-face) { overflow: hidden; padding: 0; }
