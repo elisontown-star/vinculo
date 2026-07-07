@@ -838,3 +838,7 @@ body { line-height: 1.55; letter-spacing: -0.005em; }
 /* Quando for imagem, o container do avatar não precisa de fundo/emoji */
 .ana-avatar:has(.ana-face) { background: none; padding: 0; overflow: hidden; }
 .ana-fab:has(.ana-face) { overflow: hidden; padding: 0; }
+
+/* Rosto da Ana no cabeçalho do chat — pequeno e fixo (evita esticar) */
+.ana-title-face { width: 28px !important; height: 28px !important; border-radius: 50%; object-fit: cover; flex: none; }
+.ana-chat-title .ana-face-emoji { font-size: 18px; }

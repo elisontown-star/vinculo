@@ -55,7 +55,7 @@ export default function AnaChat({ patientId }: { patientId?: string }) {
         <div className="ana-chat">
           <div className="ana-chat-head">
             <span className="ana-chat-title">
-              <AnaFace className="ana-fab-face" /> {t('anaChat.title')}
+              <AnaFace className="ana-title-face" /> {t('anaChat.title')}
             </span>
             <button className="ana-chat-close" onClick={() => setOpen(false)}>×</button>
           </div>
