@@ -4,6 +4,7 @@ import { useI18n } from './i18n';
 import { Controls } from './Controls';
 import { MfaSetup, MfaChallenge } from './Mfa';
 import { ForgotPassword } from './ForgotPassword';
+import { AcceptInvite } from './AcceptInvite';
 import Workspace from './Workspace';
 import AdminPanel from './AdminPanel';
 
@@ -90,6 +91,25 @@ function Auth({ onDone }: { onDone: () => void }) {
     } finally {
       setBusy(false);
     }
+  }
+
+  const inviteToken = (() => {
+    const p = new URLSearchParams(window.location.search);
+    return p.get('invite');
+  })();
+  const [showInvite, setShowInvite] = useState(!!inviteToken);
+
+  if (showInvite && inviteToken) {
+    return (
+      <div className="mfa-wrap">
+        <div className="mfa-topbar"><Brand /><Controls /></div>
+        <div className="mfa-center">
+          <div className="auth-card">
+            <AcceptInvite token={inviteToken} onDone={() => { setShowInvite(false); window.history.replaceState({}, '', '/'); }} />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (showForgot) {

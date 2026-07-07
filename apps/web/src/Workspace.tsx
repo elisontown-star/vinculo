@@ -10,6 +10,7 @@ import FichaTab from './tabs/FichaTab';
 import TimelineTab from './tabs/TimelineTab';
 import AnaLuizaTab from './tabs/AnaLuizaTab';
 import AnaChat from './AnaChat';
+import TeamPanel from './TeamPanel';
 
 type Tab = 'dados' | 'consulta' | 'ficha' | 'timeline' | 'ana';
 
@@ -164,6 +165,7 @@ export default function Workspace({ onLogout, onBackToAdmin }: { onLogout: () =>
 
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [zoomPhoto, setZoomPhoto] = useState<string | null>(null);
+  const [showTeam, setShowTeam] = useState(false);
 
   useEffect(() => {
     if (!zoomPhoto) return;
@@ -239,6 +241,9 @@ export default function Workspace({ onLogout, onBackToAdmin }: { onLogout: () =>
           <Controls />
           {onBackToAdmin && (
             <button className="ghost" onClick={onBackToAdmin}>← {t('admin.backToAdmin')}</button>
+          )}
+          {user?.role === 'owner' && (
+            <button className="ghost" onClick={() => setShowTeam(true)}>{t('team.button')}</button>
           )}
           <span>{user?.name}</span>
           <button className="ghost" onClick={onLogout}>
@@ -387,6 +392,8 @@ export default function Workspace({ onLogout, onBackToAdmin }: { onLogout: () =>
           <img src={zoomPhoto} alt="" onClick={(e) => e.stopPropagation()} />
         </div>
       )}
+
+      {showTeam && <TeamPanel onClose={() => setShowTeam(false)} />}
 
       <AnaChat patientId={selectedId ?? undefined} />
     </>

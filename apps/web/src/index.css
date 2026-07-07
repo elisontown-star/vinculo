@@ -811,3 +811,20 @@ body { line-height: 1.55; letter-spacing: -0.005em; }
 .admin-search-bar { display: flex; gap: 8px; margin-bottom: 20px; }
 .admin-search-bar input { flex: 1; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-sm); font-size: 14px; }
 .admin-search-bar input:focus { outline: none; border-color: var(--navy); box-shadow: 0 0 0 3px var(--navy-tint); }
+
+/* Link de clínica dentro do resultado de busca */
+.admin-link { background: none; border: none; padding: 0; color: var(--navy); font: inherit; cursor: pointer; text-decoration: underline; }
+.admin-link:hover { color: var(--orange-deep); }
+
+/* Painel de Equipe (modal) */
+.team-modal { max-width: 560px; width: 100%; }
+.team-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.team-head h3 { font-family: 'Montserrat', system-ui, sans-serif; font-weight: 700; color: var(--navy); margin: 0; }
+.team-invite-form { background: var(--line-soft); border-radius: var(--radius-sm); padding: 14px; margin: 12px 0; }
+.team-invite-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
+.team-list { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; max-height: 50vh; overflow-y: auto; }
+.team-member { display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 12px 14px; }
+.team-member-name { font-weight: 600; font-size: 14px; color: var(--ink); }
+.team-member-email { font-size: 12.5px; color: var(--muted); }
+.team-member-flags { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.team-member-actions { display: flex; gap: 6px; flex: none; }

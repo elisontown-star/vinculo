@@ -16,7 +16,7 @@ export default function AdminPanel({ onLogout, onViewClinic }: { onLogout: () =>
 
   // Busca global
   const [q, setQ] = useState('');
-  const [searchUsers, setSearchUsers] = useState<(AdminUser & { clinicName?: string })[]>([]);
+  const [searchUsers, setSearchUsers] = useState<(AdminUser & { clinicName?: string; clinicId?: string })[]>([]);
   const [searchClinics, setSearchClinics] = useState<{ id: string; name: string; isActive: boolean }[]>([]);
   const [searching, setSearching] = useState(false);
 
@@ -45,6 +45,26 @@ export default function AdminPanel({ onLogout, onViewClinic }: { onLogout: () =>
       setUsers(r.users);
     } catch {
       setMsg(t('admin.loadError'));
+    }
+  }
+
+  // Vindo da busca: garante que a clínica está carregada, troca para a aba Clínicas e abre.
+  async function openClinicFromSearch(clinicId: string) {
+    let clinic = clinics.find((c) => c.id === clinicId) ?? null;
+    if (!clinic) {
+      // Recarrega a lista caso a clínica não esteja em memória.
+      try {
+        const c = await api.adminClinics();
+        setClinics(c.clinics);
+        clinic = c.clinics.find((x) => x.id === clinicId) ?? null;
+      } catch {
+        setMsg(t('admin.loadError'));
+        return;
+      }
+    }
+    if (clinic) {
+      setView('clinics');
+      openClinic(clinic);
     }
   }
 
@@ -154,9 +174,14 @@ export default function AdminPanel({ onLogout, onViewClinic }: { onLogout: () =>
                 <h2 className="admin-h2">{t('admin.clinics')}</h2>
                 <div className="admin-list">
                   {searchClinics.map((cl) => (
-                    <div key={cl.id} className={`admin-clinic ${cl.isActive ? '' : 'inactive'}`}>
+                    <button
+                      key={cl.id}
+                      className={`admin-clinic ${cl.isActive ? '' : 'inactive'}`}
+                      onClick={() => openClinicFromSearch(cl.id)}
+                    >
                       <div className="admin-clinic-name">{cl.name}{!cl.isActive && <em> · {t('admin.disabled')}</em>}</div>
-                    </div>
+                      <div className="admin-clinic-meta">{t('admin.openClinic')}</div>
+                    </button>
                   ))}
                 </div>
               </>
@@ -170,7 +195,7 @@ export default function AdminPanel({ onLogout, onViewClinic }: { onLogout: () =>
                     <div key={u.id} className="admin-user">
                       <div className="admin-user-info">
                         <div className="admin-user-name">{u.name} <span className="admin-role">{u.role}</span></div>
-                        <div className="admin-user-email">{u.email} · {u.clinicName}</div>
+                        <div className="admin-user-email">{u.email} · <button className="admin-link" onClick={() => u.clinicId && openClinicFromSearch(u.clinicId)}>{u.clinicName}</button></div>
                         <div className="admin-user-flags">{u.mfaEnabled ? '🔒 MFA' : '⚠️ sem MFA'}</div>
                       </div>
                       <div className="admin-user-actions">

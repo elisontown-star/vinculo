@@ -2,11 +2,19 @@ import { useState } from 'react';
 import { api } from './lib/api';
 import { useI18n } from './i18n';
 
-export function ForgotPassword({ onBack }: { onBack: () => void }) {
+export function ForgotPassword({
+  onBack,
+  initialEmail = '',
+  initialCode = '',
+}: {
+  onBack: () => void;
+  initialEmail?: string;
+  initialCode?: string;
+}) {
   const { t, te } = useI18n();
-  const [step, setStep] = useState<'email' | 'reset' | 'done'>('email');
-  const [email, setEmail] = useState('');
-  const [code, setCode] = useState('');
+  const [step, setStep] = useState<'email' | 'reset' | 'done'>(initialCode ? 'reset' : 'email');
+  const [email, setEmail] = useState(initialEmail);
+  const [code, setCode] = useState(initialCode);
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');

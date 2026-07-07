@@ -32,6 +32,15 @@ export type AdminUser = {
   createdAt: number;
 };
 
+export type TeamMember = {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  isActive: boolean;
+  mfaEnabled: boolean;
+};
+
 export type Patient = {
   id: string;
   fullName: string;
@@ -143,6 +152,19 @@ export const api = {
     req(`/admin/clinics/${clinicId}/active`, { method: 'POST', body: JSON.stringify({ isActive }) }),
   adminSearch: (q: string): Promise<{ users: (AdminUser & { clinicId: string; clinicName: string })[]; clinics: { id: string; name: string; isActive: boolean; createdAt: number }[] }> =>
     req(`/admin/search?q=${encodeURIComponent(q)}`),
+
+  // --- Equipe da clínica (owner) ---
+  teamList: (): Promise<{ members: TeamMember[] }> => req('/team'),
+  teamInvite: (b: { name: string; email: string; role?: string }): Promise<{ ok: boolean; emailSent: boolean }> =>
+    req('/team/invite', { method: 'POST', body: JSON.stringify(b) }),
+  teamResend: (id: string): Promise<{ ok: boolean }> =>
+    req(`/team/${id}/resend`, { method: 'POST' }),
+  teamToggleActive: (id: string, isActive: boolean): Promise<{ ok: boolean }> =>
+    req(`/team/${id}/active`, { method: 'POST', body: JSON.stringify({ isActive }) }),
+  inviteInfo: (token: string): Promise<{ name: string; email: string }> =>
+    req(`/team/invite/${token}`),
+  inviteAccept: (token: string, password: string): Promise<{ ok: boolean; email: string }> =>
+    req('/team/invite/accept', { method: 'POST', body: JSON.stringify({ token, password }) }),
 
   mfaSetupStart: (stepToken: string): Promise<{ secret: string; uri: string }> =>
     req('/auth/mfa/setup/start', { method: 'POST', headers: { Authorization: `Bearer ${stepToken}` } }),

@@ -5,6 +5,37 @@ import type { Env } from '../types';
 const FROM = 'Vínculo <nao-responda@vinculoclinico.com.br>';
 const APP_URL = 'https://vinculoclinico.com.br';
 
+export async function sendInviteEmail(env: Env, to: string, name: string, clinicName: string, token: string): Promise<void> {
+  const link = `${APP_URL}/?invite=${token}`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
+      <h2 style="color:#1a2960; margin:0 0 8px;">Você foi convidado para o Vínculo</h2>
+      <p style="color:#444; font-size:14px; line-height:1.5;">
+        Olá, ${name}! Você foi convidado(a) para fazer parte da equipe da clínica
+        <b>${clinicName}</b> no Vínculo. Clique no botão abaixo para criar sua senha
+        e ativar sua conta:
+      </p>
+      <div style="text-align:center; margin:22px 0;">
+        <a href="${link}" style="display:inline-block; background:#1a2960; color:#fff;
+           text-decoration:none; font-size:15px; font-weight:bold; padding:14px 28px;
+           border-radius:10px;">Ativar minha conta</a>
+      </div>
+      <p style="color:#888; font-size:12.5px; line-height:1.5;">
+        Este convite expira em 7 dias. Se você não esperava este e-mail, pode ignorá-lo.
+      </p>
+    </div>
+  `;
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from: FROM, to: [to], subject: `Convite para a clínica ${clinicName} no Vínculo`, html }),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`resend_failed: ${res.status} ${body.slice(0, 200)}`);
+  }
+}
+
 export async function sendPasswordResetEmail(env: Env, to: string, code: string): Promise<void> {
   // Link que abre a tela de redefinição já com e-mail e código preenchidos.
   const link = `${APP_URL}/?reset=1&email=${encodeURIComponent(to)}&code=${code}`;

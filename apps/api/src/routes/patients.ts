@@ -39,10 +39,11 @@ function serializeSession(s: SessionRow) {
 
 // Garante que o paciente existe E pertence à clínica do usuário.
 async function findPatient(c: any, user: AuthUser, id: string) {
+  const vis = visibilityFilter(user);
   return getDb(c.env)
     .select()
     .from(patients)
-    .where(and(eq(patients.id, id), eq(patients.clinicId, user.clinicId)))
+    .where(and(eq(patients.id, id), eq(patients.clinicId, user.clinicId), vis))
     .get();
 }
 
@@ -58,12 +59,21 @@ function patientValues(body: Record<string, any>) {
 }
 
 // ---- Pacientes -----------------------------------------------------------
+// Regra de visibilidade (modelo B): o dono (owner) vê todos os pacientes da
+// clínica; o psicólogo vê apenas os seus. Retorna a condição extra do WHERE.
+function visibilityFilter(user: { role: string; userId: string }) {
+  if (user.role === 'owner' || user.role === 'platform_admin' || user.role === 'secretary') return undefined;
+  // psychologist (e demais) veem só os próprios
+  return eq(patients.psychologistId, user.userId);
+}
+
 patientRoutes.get('/', async (c) => {
   const user = c.get('user');
+  const vis = visibilityFilter(user);
   const rows = await getDb(c.env)
     .select()
     .from(patients)
-    .where(and(eq(patients.clinicId, user.clinicId), isNull(patients.deletedAt)))
+    .where(and(eq(patients.clinicId, user.clinicId), isNull(patients.deletedAt), vis))
     .orderBy(desc(patients.createdAt))
     .all();
   return c.json({ patients: rows.map((p) => serializePatient(p, false)) });
@@ -72,10 +82,11 @@ patientRoutes.get('/', async (c) => {
 // Lista os pacientes na lixeira (excluídos logicamente).
 patientRoutes.get('/trash', async (c) => {
   const user = c.get('user');
+  const vis = visibilityFilter(user);
   const rows = await getDb(c.env)
     .select()
     .from(patients)
-    .where(and(eq(patients.clinicId, user.clinicId), isNotNull(patients.deletedAt)))
+    .where(and(eq(patients.clinicId, user.clinicId), isNotNull(patients.deletedAt), vis))
     .orderBy(desc(patients.deletedAt))
     .all();
   return c.json({ patients: rows.map((p) => serializePatient(p, false)) });
