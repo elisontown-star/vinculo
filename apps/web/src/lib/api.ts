@@ -156,6 +156,8 @@ export const api = {
     req(`/admin/clinics/${clinicId}/activate-plan`, { method: 'POST' }),
   adminExtendTrial: (clinicId: string, days: number): Promise<{ ok: boolean }> =>
     req(`/admin/clinics/${clinicId}/extend-trial`, { method: 'POST', body: JSON.stringify({ days }) }),
+  adminDeleteClinic: (clinicId: string, confirmName: string, mfaCode: string): Promise<{ ok: boolean }> =>
+    req(`/admin/clinics/${clinicId}/delete`, { method: 'POST', body: JSON.stringify({ confirmName, mfaCode }) }),
   adminSearch: (q: string): Promise<{ users: (AdminUser & { clinicId: string; clinicName: string })[]; clinics: { id: string; name: string; isActive: boolean; createdAt: number }[] }> =>
     req(`/admin/search?q=${encodeURIComponent(q)}`),
 
