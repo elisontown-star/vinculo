@@ -1,17 +1,16 @@
-VINCULO — Alterar e-mail de usuario no Super Admin
+VINCULO — MFA opcional (remove obrigatoriedade)
 
-- Novo botao "Alterar e-mail" nos usuarios da clinica (busca e detalhe).
-- Valida formato e barra e-mail ja em uso; registra na auditoria.
-- NAO afeta o super admin (nao pode ser alvo).
+Antes: cadastro e login FORCAVAM configurar o MFA antes de entrar.
+Agora: o usuario entra direto (com email + senha).
+  - Quem JA ativou o MFA (ex.: super admin) continua sendo desafiado
+    normalmente pelo codigo. Nada muda para eles.
+  - Novos usuarios e quem nao tem MFA entram sem a etapa obrigatoria.
 
-SOBRE DESATIVAR MFA: ja existe! O botao "Resetar MFA" desativa o MFA e
-limpa o segredo — o usuario que perdeu o celular entra so com a senha e
-reconfigura depois. Nao precisou de mudanca.
-
-4 arquivos. Sem migracao de banco.
+1 arquivo (apps/api/src/routes/auth.ts). Sem migracao. So a API muda.
 
 CMD, na pasta do repo:
   git add .
-  git commit -m "Alterar email no super admin"
+  git commit -m "MFA opcional"
   git push
-Se a API nao subir sozinha:  cd apps\api  &&  npm run deploy
+Depois, publique a API:  cd apps\api  &&  npm run deploy
+(so a API muda, mas nao custa republicar o front tambem)

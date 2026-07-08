@@ -139,9 +139,9 @@ authRoutes.post('/register', zValidator('json', registerSchema), async (c) => {
     entityId: clinic.id,
   });
 
-  // MFA obrigatório: novo dono precisa configurar antes de entrar.
-  const setupToken = await issueStepToken(c.env, user.id, 'setup');
-  return c.json({ mfaSetupRequired: true, setupToken }, 201);
+  // MFA opcional: o novo dono entra direto (pode ativar o MFA depois, se quiser).
+  const token = await issueToken(c.env, user);
+  return c.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } }, 201);
 });
 
 const loginSchema = z.object({ email: z.string().email(), password: z.string() });
@@ -175,10 +175,10 @@ authRoutes.post('/login', zValidator('json', loginSchema), async (c) => {
     }
   }
 
-  // MFA obrigatório. Se ainda não configurou, exige setup antes de entrar.
+  // MFA opcional. Se o usuário não ativou MFA, entra direto.
   if (!user.mfaEnabled) {
-    const setupToken = await issueStepToken(c.env, user.id, 'setup');
-    return c.json({ mfaSetupRequired: true, setupToken });
+    const token = await issueToken(c.env, user);
+    return c.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
   }
 
   // Dispositivo confiável: se o navegador enviou um deviceToken válido, pula o MFA.
