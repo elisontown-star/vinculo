@@ -152,6 +152,8 @@ export const api = {
     req(`/admin/users/${userId}/reset-mfa`, { method: 'POST' }),
   adminResetPassword: (userId: string): Promise<{ ok: boolean; email: string }> =>
     req(`/admin/users/${userId}/reset-password`, { method: 'POST' }),
+  adminSetEmail: (userId: string, email: string): Promise<{ ok: boolean; email: string }> =>
+    req(`/admin/users/${userId}/email`, { method: 'POST', body: JSON.stringify({ email }) }),
   adminToggleClinic: (clinicId: string, isActive: boolean): Promise<{ ok: boolean }> =>
     req(`/admin/clinics/${clinicId}/active`, { method: 'POST', body: JSON.stringify({ isActive }) }),
   adminActivatePlan: (clinicId: string): Promise<{ ok: boolean }> =>

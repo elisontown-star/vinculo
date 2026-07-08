@@ -143,6 +143,36 @@ adminRoutes.post('/users/:id/reset-password', async (c) => {
   return c.json({ ok: true, email: target.email });
 });
 
+// --- Alterar o e-mail de um usuário (ex.: perdeu acesso ao e-mail) ------------
+const setEmailSchema = z.object({ email: z.string().email() });
+adminRoutes.post('/users/:id/email', zValidator('json', setEmailSchema), async (c) => {
+  const userId = c.req.param('id');
+  const { email } = c.req.valid('json');
+  const db = getDb(c.env);
+  const target = await db.select().from(users).where(eq(users.id, userId)).get();
+  if (!target) return c.json({ error: 'not_found' }, 404);
+  if (target.role === 'platform_admin') return c.json({ error: 'cannot_target_admin' }, 403);
+
+  const next = email.trim();
+  // E-mail já usado por outra conta?
+  const clash = await db.select({ id: users.id }).from(users).where(eq(users.email, next)).get();
+  if (clash && clash.id !== userId) return c.json({ error: 'email_in_use' }, 409);
+
+  const previous = target.email;
+  await db.update(users).set({ email: next }).where(eq(users.id, userId));
+
+  const admin = c.get('user');
+  await audit(c.env, {
+    clinicId: target.clinicId,
+    actorUserId: admin.userId,
+    action: 'admin_change_email',
+    entity: 'user',
+    entityId: userId,
+    metadata: { from: previous, to: next },
+  });
+  return c.json({ ok: true, email: next });
+});
+
 // --- Ativar/desativar uma clínica -------------------------------------------
 const toggleSchema = z.object({ isActive: z.boolean() });
 adminRoutes.post('/clinics/:id/active', zValidator('json', toggleSchema), async (c) => {

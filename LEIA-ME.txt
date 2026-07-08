@@ -1,11 +1,17 @@
-VINCULO — E-mail de solicitacao de plano
+VINCULO — Alterar e-mail de usuario no Super Admin
 
-Agora as solicitacoes de mudanca de plano vao para: suporte@vtechit.com.br
+- Novo botao "Alterar e-mail" nos usuarios da clinica (busca e detalhe).
+- Valida formato e barra e-mail ja em uso; registra na auditoria.
+- NAO afeta o super admin (nao pode ser alvo).
 
-1 arquivo (apps/api/src/routes/team.ts). Sem migracao.
+SOBRE DESATIVAR MFA: ja existe! O botao "Resetar MFA" desativa o MFA e
+limpa o segredo — o usuario que perdeu o celular entra so com a senha e
+reconfigura depois. Nao precisou de mudanca.
+
+4 arquivos. Sem migracao de banco.
 
 CMD, na pasta do repo:
   git add .
-  git commit -m "Solicitacao de plano para suporte"
+  git commit -m "Alterar email no super admin"
   git push
 Se a API nao subir sozinha:  cd apps\api  &&  npm run deploy

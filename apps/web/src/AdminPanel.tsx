@@ -98,6 +98,20 @@ export default function AdminPanel({ onLogout, onViewClinic }: { onLogout: () =>
     }
   }
 
+  async function changeEmail(u: AdminUser) {
+    const email = prompt(t('admin.changeEmailPrompt').replace('{name}', u.name), u.email);
+    if (!email || email.trim() === u.email) return;
+    try {
+      const r = await api.adminSetEmail(u.id, email.trim());
+      setMsg(t('admin.emailChanged').replace('{email}', r.email));
+      setSearchUsers((us) => us.map((x) => (x.id === u.id ? { ...x, email: r.email } : x)));
+      if (selected) openClinic(selected);
+    } catch (e) {
+      const code = e instanceof Error ? e.message : 'generic';
+      setMsg(code === 'email_in_use' ? t('admin.emailInUse') : t('admin.actionError'));
+    }
+  }
+
   async function runSearch(e: React.FormEvent) {
     e.preventDefault();
     if (q.trim().length < 2) return;
@@ -270,6 +284,7 @@ export default function AdminPanel({ onLogout, onViewClinic }: { onLogout: () =>
                       <div className="admin-user-actions">
                         <button className="ghost sm" onClick={() => resetMfa(u)}>{t('admin.resetMfa')}</button>
                         <button className="ghost sm" onClick={() => resetPassword(u)}>{t('admin.resetPw')}</button>
+                        <button className="ghost sm" onClick={() => changeEmail(u)}>{t('admin.changeEmail')}</button>
                       </div>
                     </div>
                   ))}
@@ -358,6 +373,7 @@ export default function AdminPanel({ onLogout, onViewClinic }: { onLogout: () =>
                       <div className="admin-user-actions">
                         <button className="ghost sm" onClick={() => resetMfa(u)}>{t('admin.resetMfa')}</button>
                         <button className="ghost sm" onClick={() => resetPassword(u)}>{t('admin.resetPw')}</button>
+                        <button className="ghost sm" onClick={() => changeEmail(u)}>{t('admin.changeEmail')}</button>
                       </div>
                     </div>
                   ))}
