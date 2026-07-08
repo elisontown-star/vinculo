@@ -103,7 +103,7 @@ patientRoutes.get('/', async (c) => {
 });
 
 // Lista os pacientes na lixeira (excluídos logicamente).
-patientRoutes.get('/trash', async (c) => {
+patientRoutes.get('/trash', blockSecretary, async (c) => {
   const user = c.get('user');
   const vis = visibilityFilter(user);
   const rows = await getDb(c.env)
@@ -587,7 +587,7 @@ patientRoutes.get('/:id/ai-questions', blockSecretary, async (c) => {
 // ---- Lixeira (exclusão lógica) ---------------------------------------------
 
 // Mover para a lixeira (não apaga; marca deletedAt). Consultas e timeline ficam.
-patientRoutes.delete('/:id', async (c) => {
+patientRoutes.delete('/:id', blockSecretary, async (c) => {
   const user = c.get('user');
   const id = c.req.param('id');
   const row = await findPatient(c, user, id);
@@ -609,7 +609,7 @@ patientRoutes.delete('/:id', async (c) => {
 });
 
 // Restaurar da lixeira.
-patientRoutes.post('/:id/restore', async (c) => {
+patientRoutes.post('/:id/restore', blockSecretary, async (c) => {
   const user = c.get('user');
   const id = c.req.param('id');
   const row = await findPatient(c, user, id);
@@ -631,7 +631,7 @@ patientRoutes.post('/:id/restore', async (c) => {
 });
 
 // Excluir DEFINITIVAMENTE (só faz sentido para quem já está na lixeira).
-patientRoutes.delete('/:id/permanent', async (c) => {
+patientRoutes.delete('/:id/permanent', blockSecretary, async (c) => {
   const user = c.get('user');
   const id = c.req.param('id');
   const row = await findPatient(c, user, id);
