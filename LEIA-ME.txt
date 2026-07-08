@@ -1,16 +1,17 @@
-VINCULO — Correcao: pop-up de MFA so no login
+VINCULO — Agenda: visoes Dia/Semana/Mes + busca
 
-Antes: o pop-up aparecia a cada carregamento/refresh, mesmo com a
-sessao ja aberta.
-Agora: aparece SOMENTE no momento do login (primeiro acesso). Em
-refresh/reabertura com sessao aberta, nao aparece mais.
-(Continua respeitando o "Lembrar daqui 30 dias" e quem ja tem MFA.)
+Novidades:
+ - Alternar entre DIA, SEMANA e MES (botoes no topo direito da agenda).
+ - Campo de BUSCA por nome do paciente (filtra a visao atual).
+ - Navegacao (< Hoje >) se adapta ao modo (dia/semana/mes).
+ - Visao de MES: calendario com os agendamentos por dia; clique num dia
+   para marcar, clique num agendamento para editar.
 
-1 arquivo (apps/web/src/App.tsx). Sem migracao, so o front.
+3 arquivos, so o front. Sem migracao, sem mudanca de API.
 
 CMD, na pasta do repo:
   git add .
-  git commit -m "Fix pop-up MFA so no login"
+  git commit -m "Agenda dia/semana/mes + busca"
   git push
-(So o front muda; nao precisa npm run deploy da API, mas nao custa.)
+(So o front; nao precisa npm run deploy da API.)
 Teste em aba anonima (Ctrl+Shift+R).

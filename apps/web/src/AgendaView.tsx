@@ -1,23 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api, getUser, type Appointment, type Patient } from './lib/api';
 import { useI18n } from './i18n';
-import { IconArrowLeft } from './icons';
 
 const DAY = 86400000;
+type Mode = 'day' | 'week' | 'month';
 
-function startOfWeek(d: Date): Date {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  const dow = (x.getDay() + 6) % 7; // segunda = 0
-  x.setDate(x.getDate() - dow);
-  return x;
-}
-function ymd(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-function hm(ms: number): string {
-  return new Date(ms).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-}
+function startOfDay(d: Date): Date { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
+function startOfWeek(d: Date): Date { const x = startOfDay(d); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; }
+function startOfMonth(d: Date): Date { const x = startOfDay(d); x.setDate(1); return x; }
+function ymd(d: Date): string { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+function hm(ms: number): string { return new Date(ms).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }); }
 
 type FormState = {
   id?: string;
@@ -35,7 +27,9 @@ export default function AgendaView() {
   const me = getUser() as { role?: string; id?: string; name?: string } | null;
   const isPsych = me?.role === 'psychologist';
 
-  const [weekStart, setWeekStart] = useState<Date>(startOfWeek(new Date()));
+  const [mode, setMode] = useState<Mode>('week');
+  const [anchor, setAnchor] = useState<Date>(startOfDay(new Date()));
+  const [search, setSearch] = useState('');
   const [psychs, setPsychs] = useState<{ id: string; name: string }[]>([]);
   const [selPsych, setSelPsych] = useState<string>('');
   const [appts, setAppts] = useState<Appointment[]>([]);
@@ -45,13 +39,17 @@ export default function AgendaView() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
-  const days = useMemo(() => Array.from({ length: 7 }, (_, i) => new Date(weekStart.getTime() + i * DAY)), [weekStart]);
+  const rangeStart = useMemo(() => {
+    if (mode === 'day') return startOfDay(anchor);
+    if (mode === 'week') return startOfWeek(anchor);
+    return startOfWeek(startOfMonth(anchor));
+  }, [mode, anchor]);
+  const rangeDays = mode === 'day' ? 1 : mode === 'week' ? 7 : 42;
 
   useEffect(() => {
     api.agendaPsychologists().then((r) => {
       setPsychs(r.psychologists);
-      const initial = isPsych && me?.id ? me.id : r.psychologists[0]?.id ?? '';
-      setSelPsych(initial);
+      setSelPsych(isPsych && me?.id ? me.id : r.psychologists[0]?.id ?? '');
     }).catch(() => {});
   }, []);
 
@@ -59,8 +57,8 @@ export default function AgendaView() {
     if (!selPsych) return;
     setLoading(true);
     try {
-      const from = weekStart.getTime();
-      const to = from + 7 * DAY;
+      const from = rangeStart.getTime();
+      const to = from + rangeDays * DAY;
       const r = await api.appointmentsList(from, to, selPsych);
       setAppts(r.appointments);
     } catch (e) {
@@ -69,90 +67,88 @@ export default function AgendaView() {
       setLoading(false);
     }
   }
-  useEffect(() => { load(); }, [selPsych, weekStart]);
+  useEffect(() => { load(); }, [selPsych, rangeStart.getTime(), rangeDays]);
 
-  function openCreate(day?: Date) {
-    if (patients.length === 0) api.listPatients().then((r) => setPatients(r.patients.filter((p) => p.status === 'active' || true))).catch(() => {});
-    const d = day ?? new Date();
-    setError('');
-    setForm({
-      patientId: '',
-      psychologistId: selPsych,
-      date: ymd(d),
-      time: '09:00',
-      duration: 50,
-      status: 'scheduled',
-      notes: '',
-    });
+  const visible = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return appts;
+    return appts.filter((a) => (a.patientName ?? '').toLowerCase().includes(q));
+  }, [appts, search]);
+
+  function byDay(d: Date): Appointment[] {
+    const key = ymd(d);
+    return visible.filter((a) => ymd(new Date(a.startsAt)) === key).sort((a, b) => a.startsAt - b.startsAt);
   }
 
+  function openCreate(day?: Date) {
+    if (patients.length === 0) api.listPatients().then((r) => setPatients(r.patients)).catch(() => {});
+    const d = day ?? new Date();
+    setError('');
+    setForm({ patientId: '', psychologistId: selPsych, date: ymd(d), time: '09:00', duration: 50, status: 'scheduled', notes: '' });
+  }
   function openEdit(a: Appointment) {
     if (patients.length === 0) api.listPatients().then((r) => setPatients(r.patients)).catch(() => {});
     const s = new Date(a.startsAt);
     setError('');
-    setForm({
-      id: a.id,
-      patientId: a.patientId,
-      psychologistId: a.psychologistId ?? selPsych,
-      date: ymd(s),
-      time: hm(a.startsAt),
-      duration: Math.max(15, Math.round((a.endsAt - a.startsAt) / 60000)),
-      status: a.status,
-      notes: a.notes ?? '',
-    });
+    setForm({ id: a.id, patientId: a.patientId, psychologistId: a.psychologistId ?? selPsych, date: ymd(s), time: hm(a.startsAt), duration: Math.max(15, Math.round((a.endsAt - a.startsAt) / 60000)), status: a.status, notes: a.notes ?? '' });
   }
-
   async function save() {
     if (!form) return;
     if (!form.patientId) { setError(t('agenda.pickPatient')); return; }
     const startsAt = new Date(`${form.date}T${form.time}`).getTime();
     const endsAt = startsAt + form.duration * 60000;
     if (!startsAt) { setError(t('agenda.pickTime')); return; }
-    setBusy(true);
-    setError('');
+    setBusy(true); setError('');
     try {
-      if (form.id) {
-        await api.appointmentUpdate(form.id, { startsAt, endsAt, status: form.status, notes: form.notes });
-      } else {
-        await api.appointmentCreate({ patientId: form.patientId, psychologistId: form.psychologistId, startsAt, endsAt, notes: form.notes || undefined });
-      }
-      setForm(null);
-      load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'erro');
-    } finally {
-      setBusy(false);
-    }
+      if (form.id) await api.appointmentUpdate(form.id, { startsAt, endsAt, status: form.status, notes: form.notes });
+      else await api.appointmentCreate({ patientId: form.patientId, psychologistId: form.psychologistId, startsAt, endsAt, notes: form.notes || undefined });
+      setForm(null); load();
+    } catch (e) { setError(e instanceof Error ? e.message : 'erro'); } finally { setBusy(false); }
   }
-
   async function removeAppt() {
     if (!form?.id) return;
     if (!confirm(t('agenda.confirmDelete'))) return;
     setBusy(true);
-    try {
-      await api.appointmentDelete(form.id);
-      setForm(null);
-      load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'erro');
-    } finally {
-      setBusy(false);
-    }
+    try { await api.appointmentDelete(form.id); setForm(null); load(); }
+    catch (e) { setError(e instanceof Error ? e.message : 'erro'); } finally { setBusy(false); }
   }
 
-  const weekLabel = `${days[0].toLocaleDateString(undefined, { day: '2-digit', month: 'short' })} – ${days[6].toLocaleDateString(undefined, { day: '2-digit', month: 'short' })}`;
+  function shift(dir: number) {
+    const d = new Date(anchor);
+    if (mode === 'day') d.setDate(d.getDate() + dir);
+    else if (mode === 'week') d.setDate(d.getDate() + 7 * dir);
+    else d.setMonth(d.getMonth() + dir);
+    setAnchor(startOfDay(d));
+  }
+
+  const label = useMemo(() => {
+    if (mode === 'day') return anchor.toLocaleDateString(undefined, { weekday: 'long', day: '2-digit', month: 'long' });
+    if (mode === 'week') {
+      const ws = startOfWeek(anchor); const we = new Date(ws.getTime() + 6 * DAY);
+      return `${ws.toLocaleDateString(undefined, { day: '2-digit', month: 'short' })} – ${we.toLocaleDateString(undefined, { day: '2-digit', month: 'short' })}`;
+    }
+    return anchor.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  }, [mode, anchor]);
+
   const todayYmd = ymd(new Date());
+  const weekDayNames = useMemo(() => Array.from({ length: 7 }, (_, i) => new Date(startOfWeek(new Date()).getTime() + i * DAY).toLocaleDateString(undefined, { weekday: 'short' })), []);
 
   return (
     <div className="agenda-wrap">
       <div className="agenda-toolbar">
         <div className="agenda-nav">
-          <button className="ghost sm" onClick={() => setWeekStart(new Date(weekStart.getTime() - 7 * DAY))}>‹</button>
-          <button className="ghost sm" onClick={() => setWeekStart(startOfWeek(new Date()))}>{t('agenda.today')}</button>
-          <button className="ghost sm" onClick={() => setWeekStart(new Date(weekStart.getTime() + 7 * DAY))}>›</button>
-          <span className="agenda-weeklabel">{weekLabel}</span>
+          <button className="ghost sm" onClick={() => shift(-1)}>‹</button>
+          <button className="ghost sm" onClick={() => setAnchor(startOfDay(new Date()))}>{t('agenda.today')}</button>
+          <button className="ghost sm" onClick={() => shift(1)}>›</button>
+          <span className="agenda-weeklabel">{label}</span>
         </div>
         <div className="agenda-actions">
+          <input className="agenda-search" placeholder={t('agenda.search')} value={search} onChange={(e) => setSearch(e.target.value)} />
+          <div className="agenda-modes">
+            <button className={mode === 'day' ? 'on' : ''} onClick={() => setMode('day')}>{t('agenda.day')}</button>
+            <button className={mode === 'week' ? 'on' : ''} onClick={() => setMode('week')}>{t('agenda.week')}</button>
+            <button className={mode === 'month' ? 'on' : ''} onClick={() => setMode('month')}>{t('agenda.month')}</button>
+          </div>
           {!isPsych && (
             <select className="agenda-psych" value={selPsych} onChange={(e) => setSelPsych(e.target.value)}>
               {psychs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -164,31 +160,69 @@ export default function AgendaView() {
 
       {error && !form && <div className="container"><div className="error">{error}</div></div>}
 
-      <div className="agenda-week">
-        {days.map((d) => {
-          const key = ymd(d);
-          const dayAppts = appts
-            .filter((a) => ymd(new Date(a.startsAt)) === key)
-            .sort((a, b) => a.startsAt - b.startsAt);
-          return (
-            <div className={`agenda-col ${key === todayYmd ? 'today' : ''}`} key={key}>
-              <div className="agenda-dayhead" onClick={() => openCreate(d)}>
-                <span className="agenda-dow">{d.toLocaleDateString(undefined, { weekday: 'short' })}</span>
-                <span className="agenda-daynum">{d.getDate()}</span>
+      {mode === 'day' && (
+        <div className="agenda-day">
+          {byDay(anchor).map((a) => (
+            <button key={a.id} className={`agenda-card lg st-${a.status}`} onClick={() => openEdit(a)}>
+              <span className="agenda-time">{hm(a.startsAt)}–{hm(a.endsAt)}</span>
+              <span className="agenda-pat">{a.patientName ?? '—'}</span>
+            </button>
+          ))}
+          {byDay(anchor).length === 0 && <div className="agenda-empty lg" onClick={() => openCreate(anchor)}>{t('agenda.noneDay')}</div>}
+        </div>
+      )}
+
+      {mode === 'week' && (
+        <div className="agenda-week">
+          {Array.from({ length: 7 }, (_, i) => new Date(startOfWeek(anchor).getTime() + i * DAY)).map((d) => {
+            const dayAppts = byDay(d);
+            const key = ymd(d);
+            return (
+              <div className={`agenda-col ${key === todayYmd ? 'today' : ''}`} key={key}>
+                <div className="agenda-dayhead" onClick={() => openCreate(d)}>
+                  <span className="agenda-dow">{d.toLocaleDateString(undefined, { weekday: 'short' })}</span>
+                  <span className="agenda-daynum">{d.getDate()}</span>
+                </div>
+                <div className="agenda-daybody">
+                  {dayAppts.map((a) => (
+                    <button key={a.id} className={`agenda-card st-${a.status}`} onClick={() => openEdit(a)}>
+                      <span className="agenda-time">{hm(a.startsAt)}</span>
+                      <span className="agenda-pat">{a.patientName ?? '—'}</span>
+                    </button>
+                  ))}
+                  {dayAppts.length === 0 && <div className="agenda-empty" onClick={() => openCreate(d)}>+</div>}
+                </div>
               </div>
-              <div className="agenda-daybody">
-                {dayAppts.map((a) => (
-                  <button key={a.id} className={`agenda-card st-${a.status}`} onClick={() => openEdit(a)}>
-                    <span className="agenda-time">{hm(a.startsAt)}</span>
-                    <span className="agenda-pat">{a.patientName ?? '—'}</span>
-                  </button>
-                ))}
-                {dayAppts.length === 0 && <div className="agenda-empty" onClick={() => openCreate(d)}>+</div>}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
+
+      {mode === 'month' && (
+        <div className="agenda-monthwrap">
+          <div className="agenda-mhead-row">
+            {weekDayNames.map((w) => <div className="agenda-mhead" key={w}>{w}</div>)}
+          </div>
+          <div className="agenda-month">
+            {Array.from({ length: 42 }, (_, i) => new Date(rangeStart.getTime() + i * DAY)).map((d) => {
+              const key = ymd(d);
+              const inMonth = d.getMonth() === anchor.getMonth();
+              const dayAppts = byDay(d);
+              return (
+                <div className={`agenda-mcell ${inMonth ? '' : 'out'} ${key === todayYmd ? 'today' : ''}`} key={key} onClick={() => openCreate(d)}>
+                  <span className="agenda-mdaynum">{d.getDate()}</span>
+                  {dayAppts.slice(0, 3).map((a) => (
+                    <button key={a.id} className={`agenda-mchip st-${a.status}`} onClick={(e) => { e.stopPropagation(); openEdit(a); }}>
+                      {hm(a.startsAt)} {a.patientName ?? '—'}
+                    </button>
+                  ))}
+                  {dayAppts.length > 3 && <span className="agenda-mmore">+{dayAppts.length - 3} {t('agenda.more')}</span>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {loading && <div className="agenda-loading">{t('admin.loading')}</div>}
 
