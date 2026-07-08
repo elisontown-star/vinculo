@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { api, setToken, clearToken, setUser, getUser } from './lib/api';
 import { useI18n } from './i18n';
 import { Controls } from './Controls';
@@ -346,15 +346,14 @@ export default function App() {
   const [adminView, setAdminView] = useState<'admin' | 'clinic'>('admin');
   const [mfaPrompt, setMfaPrompt] = useState(false);
 
-  useEffect(() => {
-    if (!authed) {
-      setMfaPrompt(false);
-      return;
-    }
+  // Mostra o pop-up de MFA APENAS no primeiro acesso (logo após o login).
+  // Nunca em refresh/reabertura com a sessão já aberta.
+  function afterLogin() {
+    setAuthed(true);
     const u = getUser() as { mfaEnabled?: boolean } | null;
     const snooze = Number(localStorage.getItem('vinculo_mfa_snooze') || 0);
-    setMfaPrompt(!!u && !u.mfaEnabled && Date.now() > snooze);
-  }, [authed]);
+    if (u && !u.mfaEnabled && Date.now() > snooze) setMfaPrompt(true);
+  }
 
   function logout() {
     clearToken();
@@ -363,7 +362,7 @@ export default function App() {
     setAdminView('admin');
   }
 
-  if (!authed) return <Auth onDone={() => setAuthed(true)} />;
+  if (!authed) return <Auth onDone={afterLogin} />;
 
   const user = getUser();
   let content;
