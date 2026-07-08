@@ -20,6 +20,8 @@ export type AdminClinic = {
   isActive: boolean;
   status?: 'trial' | 'active' | 'blocked';
   trialEndsAt?: number | null;
+  plan?: 'essencial' | 'pro' | 'plus';
+  companyCode?: string | null;
   users: number;
   patients: number;
 };
@@ -158,6 +160,8 @@ export const api = {
     req(`/admin/clinics/${clinicId}/extend-trial`, { method: 'POST', body: JSON.stringify({ days }) }),
   adminDeleteClinic: (clinicId: string, confirmName: string, mfaCode: string): Promise<{ ok: boolean }> =>
     req(`/admin/clinics/${clinicId}/delete`, { method: 'POST', body: JSON.stringify({ confirmName, mfaCode }) }),
+  adminSetPlan: (clinicId: string, plan: 'essencial' | 'pro' | 'plus'): Promise<{ ok: boolean }> =>
+    req(`/admin/clinics/${clinicId}/plan`, { method: 'POST', body: JSON.stringify({ plan }) }),
   adminSearch: (q: string): Promise<{ users: (AdminUser & { clinicId: string; clinicName: string })[]; clinics: { id: string; name: string; isActive: boolean; createdAt: number }[] }> =>
     req(`/admin/search?q=${encodeURIComponent(q)}`),
 
@@ -170,6 +174,8 @@ export const api = {
   }> => req('/team'),
   teamInvite: (b: { name: string; email: string; role?: string }): Promise<{ ok: boolean; emailSent: boolean }> =>
     req('/team/invite', { method: 'POST', body: JSON.stringify(b) }),
+  teamRequestPlan: (plan: 'essencial' | 'pro' | 'plus', message?: string): Promise<{ ok: boolean }> =>
+    req('/team/plan-request', { method: 'POST', body: JSON.stringify({ plan, message }) }),
   teamResend: (id: string): Promise<{ ok: boolean }> =>
     req(`/team/${id}/resend`, { method: 'POST' }),
   teamToggleActive: (id: string, isActive: boolean): Promise<{ ok: boolean }> =>

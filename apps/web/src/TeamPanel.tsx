@@ -17,6 +17,9 @@ export default function TeamPanel({ onClose }: { onClose: () => void }) {
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [showInvite, setShowInvite] = useState(false);
+  const [showPlanReq, setShowPlanReq] = useState(false);
+  const [reqPlan, setReqPlan] = useState<'essencial' | 'pro' | 'plus'>('pro');
+  const [reqMsg, setReqMsg] = useState('');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [role, setRole] = useState(me?.role === 'owner' ? 'psychologist' : 'secretary');
@@ -54,6 +57,22 @@ export default function TeamPanel({ onClose }: { onClose: () => void }) {
         forbidden_role: 'team.forbiddenRole',
       };
       setError(map[code] ? t(map[code]) : te(code));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function requestPlan(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError('');
+    try {
+      await api.teamRequestPlan(reqPlan, reqMsg.trim() || undefined);
+      setShowPlanReq(false);
+      setReqMsg('');
+      setMsg(t('team.planRequestSent'));
+    } catch (err) {
+      setError(te(err instanceof Error ? err.message : 'generic'));
     } finally {
       setBusy(false);
     }
@@ -105,6 +124,27 @@ export default function TeamPanel({ onClose }: { onClose: () => void }) {
                 {t('team.roleSecretary')} <b>{info.usage.secretary}/{info.limits.secretary}</b>
               </span>
             </div>
+            {isOwner && (
+              <div className="team-plan-req">
+                {!showPlanReq ? (
+                  <button className="link-btn" onClick={() => setShowPlanReq(true)}>{t('team.requestPlan')}</button>
+                ) : (
+                  <form onSubmit={requestPlan} className="team-plan-req-form">
+                    <label>{t('team.requestPlanTo')}</label>
+                    <select value={reqPlan} onChange={(e) => setReqPlan(e.target.value as 'essencial' | 'pro' | 'plus')}>
+                      <option value="essencial">{t('plan.essencial')}</option>
+                      <option value="pro">{t('plan.pro')}</option>
+                      <option value="plus">{t('plan.plus')}</option>
+                    </select>
+                    <textarea value={reqMsg} onChange={(e) => setReqMsg(e.target.value)} placeholder={t('team.requestPlanMsg')} rows={2} />
+                    <div className="team-invite-actions">
+                      <button type="button" className="ghost sm" onClick={() => setShowPlanReq(false)}>{t('btn.cancel')}</button>
+                      <button className="btn sm" disabled={busy}>{busy ? t('btn.wait') : t('team.requestPlanSend')}</button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            )}
           </div>
         )}
 

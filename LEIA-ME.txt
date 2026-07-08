@@ -1,14 +1,11 @@
-VINCULO — Correção de papéis (owner é psicólogo)
+VINCULO — E-mail de solicitacao de plano
 
-- Owner passa a aparecer como "Psicólogo (owner)" na tela (não mais "owner"/"Administrador").
-- Papéis mostrados com rótulo correto: Psicólogo, Secretária.
-- "Owner" removido das opções de convite (ninguém convida owner).
+Agora as solicitacoes de mudanca de plano vao para: suporte@vtechit.com.br
 
-5 arquivos, sem migração de banco.
+1 arquivo (apps/api/src/routes/team.ts). Sem migracao.
 
-CMD, na pasta do repositório:
+CMD, na pasta do repo:
   git add .
-  git commit -m "Corrige exibicao dos papeis"
+  git commit -m "Solicitacao de plano para suporte"
   git push
-Se a API não subir sozinha:  cd apps\api  &&  npm run deploy
-Teste em aba anônima (Ctrl+Shift+R).
+Se a API nao subir sozinha:  cd apps\api  &&  npm run deploy

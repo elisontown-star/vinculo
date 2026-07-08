@@ -173,6 +173,19 @@ export default function AdminPanel({ onLogout, onViewClinic }: { onLogout: () =>
     }
   }
 
+  async function changePlan(plan: 'essencial' | 'pro' | 'plus') {
+    if (!selected || (selected.plan ?? 'essencial') === plan) return;
+    try {
+      await api.adminSetPlan(selected.id, plan);
+      setSelected({ ...selected, plan });
+      setClinics((cs) => cs.map((cl) => (cl.id === selected.id ? { ...cl, plan } : cl)));
+      setMsg(t('admin.planChanged').replace('{plan}', t('plan.' + plan)));
+    } catch (e) {
+      const code = e instanceof Error ? e.message : 'generic';
+      setMsg(code === 'plan_downgrade_blocked' ? t('admin.planDowngradeBlocked') : t('admin.actionError'));
+    }
+  }
+
   function logout() {
     clearToken();
     onLogout();
@@ -320,6 +333,18 @@ export default function AdminPanel({ onLogout, onViewClinic }: { onLogout: () =>
                     {selected.status === 'blocked' && <><IconBlock size={16} /> {t('admin.statusBlocked')}</>}
                   </div>
                 )}
+                <div className="admin-plan-picker">
+                  <span className="admin-plan-label">{t('admin.plan')}</span>
+                  {(['essencial', 'pro', 'plus'] as const).map((p) => (
+                    <button
+                      key={p}
+                      className={`admin-plan-opt ${(selected.plan ?? 'essencial') === p ? 'on' : ''}`}
+                      onClick={() => changePlan(p)}
+                    >
+                      {t('plan.' + p)}
+                    </button>
+                  ))}
+                </div>
                 <div className="admin-list">
                   {users.map((u) => (
                     <div key={u.id} className="admin-user">

@@ -955,3 +955,18 @@ body { line-height: 1.55; letter-spacing: -0.005em; }
 .team-seats .seat b { color: var(--navy); }
 .team-seats .seat.full { border-color: var(--orange); color: var(--orange-deep); }
 .team-seats .seat.full b { color: var(--orange-deep); }
+
+/* --- Super admin: seletor de plano da clínica ------------------------------ */
+.admin-plan-picker { display: flex; align-items: center; gap: 8px; margin: 12px 0; flex-wrap: wrap; }
+.admin-plan-label { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+.admin-plan-opt { padding: 6px 16px; font-size: 13px; font-weight: 600; border: 1.5px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--muted); cursor: pointer; }
+.admin-plan-opt:hover { border-color: var(--navy-2); color: var(--navy); }
+.admin-plan-opt.on { background: var(--navy); border-color: var(--navy); color: #fff; }
+
+/* --- Equipe: solicitar mudança de plano ------------------------------------ */
+.team-plan-req { margin-top: 10px; }
+.link-btn { background: none; border: none; color: var(--orange-deep); font-size: 12.5px; font-weight: 600; cursor: pointer; padding: 0; text-decoration: underline; }
+.team-plan-req-form { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.team-plan-req-form label { font-size: 12px; font-weight: 600; color: var(--ink); }
+.team-plan-req-form select, .team-plan-req-form textarea { padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius-sm); font-size: 13px; background: var(--surface); color: var(--ink); font-family: inherit; }
+.team-plan-req-form textarea { resize: vertical; }

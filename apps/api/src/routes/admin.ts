@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { eq, and, isNull, sql } from 'drizzle-orm';
+import { eq, and, isNull, sql, inArray } from 'drizzle-orm';
 import { getDb } from '../lib/db';
 import {
   clinics,
@@ -18,6 +18,7 @@ import {
 import { requireAuth, requireRole } from '../middleware/auth';
 import { sendPasswordResetEmail } from '../lib/email';
 import { verifyTotp, consumeRecoveryCode } from '../lib/mfa';
+import { PLAN_LIMITS, type PlanKey } from '../lib/plans';
 import { audit } from '../lib/audit';
 import type { AppBindings } from '../types';
 
@@ -53,6 +54,8 @@ adminRoutes.get('/clinics', async (c) => {
       isActive: clinic.isActive ?? true,
       status: clinic.status ?? 'trial',
       trialEndsAt: clinic.trialEndsAt ?? null,
+      plan: clinic.plan ?? 'essencial',
+      companyCode: clinic.companyCode ?? null,
       users: userCount?.n ?? 0,
       patients: patientCount?.n ?? 0,
     });
@@ -331,6 +334,47 @@ adminRoutes.post('/clinics/:id/extend-trial', zValidator('json', extendSchema), 
 
   const admin = c.get('user');
   await audit(c.env, { clinicId, actorUserId: admin.userId, action: 'admin_extend_trial', entity: 'clinic', entityId: clinicId });
+  return c.json({ ok: true });
+});
+
+// --- Mudar o plano da clínica (upgrade/downgrade) ----------------------------
+// Ação do super admin (o owner apenas solicita por e-mail). No downgrade,
+// bloqueia se a clínica já tiver mais usuários do que o novo plano comporta.
+const planSchema = z.object({ plan: z.enum(['essencial', 'pro', 'plus']) });
+adminRoutes.post('/clinics/:id/plan', zValidator('json', planSchema), async (c) => {
+  const clinicId = c.req.param('id');
+  const { plan } = c.req.valid('json');
+  const db = getDb(c.env);
+  const clinic = await db.select().from(clinics).where(eq(clinics.id, clinicId)).get();
+  if (!clinic) return c.json({ error: 'not_found' }, 404);
+
+  // Uso atual (owner conta como psicólogo).
+  const psychRow = await db
+    .select({ n: sql<number>`count(*)` })
+    .from(users)
+    .where(and(eq(users.clinicId, clinicId), inArray(users.role, ['psychologist', 'owner'])))
+    .get();
+  const secRow = await db
+    .select({ n: sql<number>`count(*)` })
+    .from(users)
+    .where(and(eq(users.clinicId, clinicId), eq(users.role, 'secretary')))
+    .get();
+  const usage = { psychologist: psychRow?.n ?? 0, secretary: secRow?.n ?? 0 };
+  const limit = PLAN_LIMITS[plan as PlanKey];
+  if (usage.psychologist > limit.psychologist || usage.secretary > limit.secretary) {
+    return c.json({ error: 'plan_downgrade_blocked', usage, limit, plan }, 409);
+  }
+
+  await db.update(clinics).set({ plan }).where(eq(clinics.id, clinicId));
+  const admin = c.get('user');
+  await audit(c.env, {
+    clinicId,
+    actorUserId: admin.userId,
+    action: 'admin_set_plan',
+    entity: 'clinic',
+    entityId: clinicId,
+    metadata: { from: clinic.plan, to: plan },
+  });
   return c.json({ ok: true });
 });
 
