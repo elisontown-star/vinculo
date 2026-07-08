@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
-import { api, type TeamMember } from './lib/api';
+import { api, getUser, type TeamMember } from './lib/api';
 import { useI18n } from './i18n';
+import { roleLabel } from './roles';
 import { IconLock, IconCheck, IconClock } from './icons';
 
 export default function TeamPanel({ onClose }: { onClose: () => void }) {
   const { t, te } = useI18n();
+  const me = getUser();
+  const isOwner = me?.role === 'owner';
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [info, setInfo] = useState<{
     companyCode: string | null;
@@ -16,7 +19,7 @@ export default function TeamPanel({ onClose }: { onClose: () => void }) {
   const [showInvite, setShowInvite] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState('psychologist');
+  const [role, setRole] = useState(me?.role === 'owner' ? 'psychologist' : 'secretary');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
@@ -46,7 +49,11 @@ export default function TeamPanel({ onClose }: { onClose: () => void }) {
       load();
     } catch (err) {
       const code = err instanceof Error ? err.message : 'generic';
-      setError(code === 'plan_limit_reached' ? t('team.planLimit') : te(code));
+      const map: Record<string, string> = {
+        plan_limit_reached: 'team.planLimit',
+        forbidden_role: 'team.forbiddenRole',
+      };
+      setError(map[code] ? t(map[code]) : te(code));
     } finally {
       setBusy(false);
     }
@@ -118,9 +125,8 @@ export default function TeamPanel({ onClose }: { onClose: () => void }) {
             <div className="field">
               <label>{t('team.role')}</label>
               <select value={role} onChange={(e) => setRole(e.target.value)}>
-                <option value="psychologist">{t('team.rolePsychologist')}</option>
+                {isOwner && <option value="psychologist">{t('team.rolePsychologist')}</option>}
                 <option value="secretary">{t('team.roleSecretary')}</option>
-                <option value="owner">{t('team.roleOwner')}</option>
               </select>
             </div>
             <div className="team-invite-actions">
@@ -137,7 +143,7 @@ export default function TeamPanel({ onClose }: { onClose: () => void }) {
             {members.map((m) => (
               <div key={m.id} className="team-member">
                 <div>
-                  <div className="team-member-name">{m.name} <span className="admin-role">{m.role}</span></div>
+                  <div className="team-member-name">{m.name} <span className="admin-role">{roleLabel(t, m.role)}</span></div>
                   <div className="team-member-email">{m.email}</div>
                   <div className="team-member-flags">
                     {m.isActive ? (
@@ -149,7 +155,7 @@ export default function TeamPanel({ onClose }: { onClose: () => void }) {
                     )}
                   </div>
                 </div>
-                {m.role !== 'owner' && (
+                {isOwner && m.role !== 'owner' && (
                   <div className="team-member-actions">
                     {!m.isActive && <button className="ghost sm" onClick={() => resend(m)}>{t('team.resend')}</button>}
                     <button className="ghost sm" onClick={() => toggle(m)}>

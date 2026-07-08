@@ -4,6 +4,7 @@ import { useI18n } from './i18n';
 import { Brand } from './App';
 import { Controls } from './Controls';
 import { IconLock, IconWarning, IconClock, IconCheckCircle, IconBlock } from './icons';
+import { roleLabel } from './roles';
 
 export default function AdminPanel({ onLogout, onViewClinic }: { onLogout: () => void; onViewClinic?: () => void }) {
   const { t } = useI18n();
@@ -249,7 +250,7 @@ export default function AdminPanel({ onLogout, onViewClinic }: { onLogout: () =>
                   {searchUsers.map((u) => (
                     <div key={u.id} className="admin-user">
                       <div className="admin-user-info">
-                        <div className="admin-user-name">{u.name} <span className="admin-role">{u.role}</span></div>
+                        <div className="admin-user-name">{u.name} <span className="admin-role">{roleLabel(t, u.role)}</span></div>
                         <div className="admin-user-email">{u.email} · <button className="admin-link" onClick={() => u.clinicId && openClinicFromSearch(u.clinicId)}>{u.clinicName}</button></div>
                         <div className="admin-user-flags">{u.mfaEnabled ? <span className="flag ok"><IconLock size={13} /> MFA</span> : <span className="flag warn"><IconWarning size={13} /> sem MFA</span>}</div>
                       </div>
@@ -323,7 +324,7 @@ export default function AdminPanel({ onLogout, onViewClinic }: { onLogout: () =>
                   {users.map((u) => (
                     <div key={u.id} className="admin-user">
                       <div className="admin-user-info">
-                        <div className="admin-user-name">{u.name} <span className="admin-role">{u.role}</span></div>
+                        <div className="admin-user-name">{u.name} <span className="admin-role">{roleLabel(t, u.role)}</span></div>
                         <div className="admin-user-email">{u.email}</div>
                         <div className="admin-user-flags">
                           {u.mfaEnabled ? <span className="flag ok"><IconLock size={13} /> MFA</span> : <span className="flag warn"><IconWarning size={13} /> sem MFA</span>} · {u.isActive ? t('admin.active') : t('admin.disabled')}

@@ -19,7 +19,7 @@ function randomToken(): string {
 }
 
 // ---- Rotas do dono da clínica (owner) --------------------------------------
-teamRoutes.get('/', requireAuth, requireRole('owner'), async (c) => {
+teamRoutes.get('/', requireAuth, requireRole('owner', 'psychologist'), async (c) => {
   const user = c.get('user');
   const db = getDb(c.env);
   const rows = await db.select().from(users).where(eq(users.clinicId, user.clinicId)).all();
@@ -48,13 +48,19 @@ teamRoutes.get('/', requireAuth, requireRole('owner'), async (c) => {
 const inviteSchema = z.object({
   name: z.string().min(2),
   email: z.string().email(),
-  role: z.enum(['psychologist', 'secretary', 'owner']).default('psychologist'),
+  role: z.enum(['psychologist', 'secretary']).default('psychologist'),
 });
 
-teamRoutes.post('/invite', requireAuth, requireRole('owner'), zValidator('json', inviteSchema), async (c) => {
+teamRoutes.post('/invite', requireAuth, requireRole('owner', 'psychologist'), zValidator('json', inviteSchema), async (c) => {
   const user = c.get('user');
   const { name, email, role } = c.req.valid('json');
   const db = getDb(c.env);
+
+  // Licenciamento: um psicólogo só pode criar secretárias — nunca outro
+  // psicólogo (nem owner). Só o owner adiciona psicólogos ao plano.
+  if (user.role === 'psychologist' && role !== 'secretary') {
+    return c.json({ error: 'forbidden_role' }, 403);
+  }
 
   // E-mail já existe?
   const existing = await db.select().from(users).where(eq(users.email, email)).get();
