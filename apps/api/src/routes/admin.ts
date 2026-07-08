@@ -3,9 +3,21 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { eq, and, isNull, sql } from 'drizzle-orm';
 import { getDb } from '../lib/db';
-import { clinics, users, patients } from '@vinculo/db/schema';
+import {
+  clinics,
+  users,
+  patients,
+  sessions,
+  timelineEvents,
+  aiSummaries,
+  aiAlerts,
+  appointments,
+  consents,
+  documents,
+} from '@vinculo/db/schema';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { sendPasswordResetEmail } from '../lib/email';
+import { verifyTotp, consumeRecoveryCode } from '../lib/mfa';
 import { audit } from '../lib/audit';
 import type { AppBindings } from '../types';
 
@@ -149,6 +161,100 @@ adminRoutes.post('/clinics/:id/active', zValidator('json', toggleSchema), async 
     entity: 'clinic',
     entityId: clinicId,
   });
+  return c.json({ ok: true });
+});
+
+// --- APAGAR uma clínica permanentemente (destrutivo e irreversível) ----------
+// Exige: (1) o nome exato da clínica digitado, (2) um código MFA válido do
+// próprio super admin. Apaga em cascata TODOS os dados da clínica, de forma
+// atômica (D1 batch = transação). O registro de auditoria é gravado ANTES da
+// exclusão e sobrevive a ela (audit_log não tem FK para clinics).
+const deleteClinicSchema = z.object({
+  confirmName: z.string().min(1),
+  mfaCode: z.string().min(1),
+});
+adminRoutes.post('/clinics/:id/delete', zValidator('json', deleteClinicSchema), async (c) => {
+  const clinicId = c.req.param('id');
+  const { confirmName, mfaCode } = c.req.valid('json');
+  const db = getDb(c.env);
+
+  const clinic = await db.select().from(clinics).where(eq(clinics.id, clinicId)).get();
+  if (!clinic) return c.json({ error: 'not_found' }, 404);
+
+  // 1) Confirmação pelo nome exato — evita apagar a clínica errada.
+  if (confirmName.trim() !== clinic.name.trim()) {
+    return c.json({ error: 'name_mismatch' }, 400);
+  }
+
+  // 2) MFA do próprio super admin (TOTP, com fallback para código de recuperação).
+  const admin = c.get('user');
+  const adminUser = await db.select().from(users).where(eq(users.id, admin.userId)).get();
+  if (!adminUser || !adminUser.mfaEnabled || !adminUser.mfaSecret) {
+    return c.json({ error: 'admin_mfa_required' }, 403);
+  }
+  let mfaOk = verifyTotp(adminUser.mfaSecret, mfaCode);
+  if (!mfaOk && adminUser.mfaRecoveryCodes) {
+    const remaining = await consumeRecoveryCode(mfaCode, JSON.parse(adminUser.mfaRecoveryCodes));
+    if (remaining) {
+      mfaOk = true;
+      await db
+        .update(users)
+        .set({ mfaRecoveryCodes: JSON.stringify(remaining) })
+        .where(eq(users.id, adminUser.id));
+    }
+  }
+  if (!mfaOk) return c.json({ error: 'invalid_mfa' }, 401);
+
+  // 3) Nunca apagar uma clínica que contenha um super admin (evita auto-lockout).
+  const adminInClinic = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(and(eq(users.clinicId, clinicId), eq(users.role, 'platform_admin')))
+    .get();
+  if (adminInClinic) return c.json({ error: 'clinic_has_admin' }, 409);
+
+  // 4) Contadores para o registro de auditoria (antes de apagar).
+  const userCount = await db
+    .select({ n: sql<number>`count(*)` })
+    .from(users)
+    .where(eq(users.clinicId, clinicId))
+    .get();
+  const patientCount = await db
+    .select({ n: sql<number>`count(*)` })
+    .from(patients)
+    .where(eq(patients.clinicId, clinicId))
+    .get();
+
+  // 5) Auditoria ANTES da exclusão (append-only, sobrevive à clínica).
+  await audit(c.env, {
+    clinicId,
+    actorUserId: admin.userId,
+    action: 'admin_delete_clinic',
+    entity: 'clinic',
+    entityId: clinicId,
+    metadata: {
+      name: clinic.name,
+      users: userCount?.n ?? 0,
+      patients: patientCount?.n ?? 0,
+    },
+  });
+
+  // 6) Exclusão em cascata, atômica. Ordem filho → pai (segura para FKs).
+  // NOTA: quando o R2 for ligado (documents.r2Key), apagar os blobs do bucket
+  // AQUI antes de remover as linhas, para não deixar arquivos órfãos.
+  await db.batch([
+    db.delete(documents).where(eq(documents.clinicId, clinicId)),
+    db.delete(consents).where(eq(consents.clinicId, clinicId)),
+    db.delete(appointments).where(eq(appointments.clinicId, clinicId)),
+    db.delete(aiAlerts).where(eq(aiAlerts.clinicId, clinicId)),
+    db.delete(aiSummaries).where(eq(aiSummaries.clinicId, clinicId)),
+    db.delete(timelineEvents).where(eq(timelineEvents.clinicId, clinicId)),
+    db.delete(sessions).where(eq(sessions.clinicId, clinicId)),
+    db.delete(patients).where(eq(patients.clinicId, clinicId)),
+    db.delete(users).where(eq(users.clinicId, clinicId)),
+    db.delete(clinics).where(eq(clinics.id, clinicId)),
+  ]);
+
   return c.json({ ok: true });
 });
 

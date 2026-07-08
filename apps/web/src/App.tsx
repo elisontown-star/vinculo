@@ -33,6 +33,23 @@ export function Brand({ hideLogo = false }: { hideLogo?: boolean }) {
   );
 }
 
+function maskTaxId(type: 'cnpj' | 'cpf', v: string): string {
+  const d = v.replace(/\D/g, '');
+  if (type === 'cpf') {
+    const s = d.slice(0, 11);
+    if (s.length > 9) return `${s.slice(0, 3)}.${s.slice(3, 6)}.${s.slice(6, 9)}-${s.slice(9)}`;
+    if (s.length > 6) return `${s.slice(0, 3)}.${s.slice(3, 6)}.${s.slice(6)}`;
+    if (s.length > 3) return `${s.slice(0, 3)}.${s.slice(3)}`;
+    return s;
+  }
+  const s = d.slice(0, 14);
+  if (s.length > 12) return `${s.slice(0, 2)}.${s.slice(2, 5)}.${s.slice(5, 8)}/${s.slice(8, 12)}-${s.slice(12)}`;
+  if (s.length > 8) return `${s.slice(0, 2)}.${s.slice(2, 5)}.${s.slice(5, 8)}/${s.slice(8)}`;
+  if (s.length > 5) return `${s.slice(0, 2)}.${s.slice(2, 5)}.${s.slice(5)}`;
+  if (s.length > 2) return `${s.slice(0, 2)}.${s.slice(2)}`;
+  return s;
+}
+
 function Auth({ onDone }: { onDone: () => void }) {
   const { t, te } = useI18n();
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -40,6 +57,9 @@ function Auth({ onDone }: { onDone: () => void }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [plan, setPlan] = useState<'essencial' | 'pro' | 'plus'>('essencial');
+  const [taxIdType, setTaxIdType] = useState<'cnpj' | 'cpf'>('cnpj');
+  const [taxId, setTaxId] = useState('');
   const [error, setError] = useState('');
   const [blocked, setBlocked] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -67,12 +87,17 @@ function Auth({ onDone }: { onDone: () => void }) {
         setError(t('pw.tooWeak'));
         return;
       }
+      const taxDigits = taxId.replace(/\D/g, '');
+      if (taxDigits.length !== (taxIdType === 'cpf' ? 11 : 14)) {
+        setError(t('err.invalid_tax_id'));
+        return;
+      }
     }
     setBusy(true);
     try {
       const res: any =
         mode === 'register'
-          ? await api.register({ clinicName, name, email, password })
+          ? await api.register({ clinicName, name, email, password, plan, taxIdType, taxId: taxId.replace(/\D/g, '') })
           : await api.login({ email, password });
 
       if (res.mfaSetupRequired) {
@@ -237,6 +262,32 @@ function Auth({ onDone }: { onDone: () => void }) {
                   <input id="clinic" value={clinicName} onChange={(e) => setClinicName(e.target.value)} required />
                 </div>
                 <div className="field">
+                  <label htmlFor="taxid">{t('lbl.taxId')}</label>
+                  <div className="seg">
+                    <button type="button" className={taxIdType === 'cnpj' ? 'on' : ''} onClick={() => { setTaxIdType('cnpj'); setTaxId(''); }}>{t('taxId.cnpj')}</button>
+                    <button type="button" className={taxIdType === 'cpf' ? 'on' : ''} onClick={() => { setTaxIdType('cpf'); setTaxId(''); }}>{t('taxId.cpf')}</button>
+                  </div>
+                  <input
+                    id="taxid"
+                    inputMode="numeric"
+                    value={taxId}
+                    onChange={(e) => setTaxId(maskTaxId(taxIdType, e.target.value))}
+                    placeholder={taxIdType === 'cnpj' ? '00.000.000/0000-00' : '000.000.000-00'}
+                    required
+                  />
+                </div>
+                <div className="field">
+                  <label>{t('lbl.plan')}</label>
+                  <div className="plan-picker">
+                    {(['essencial', 'pro', 'plus'] as const).map((p) => (
+                      <button type="button" key={p} className={`plan-card ${plan === p ? 'on' : ''}`} onClick={() => setPlan(p)}>
+                        <span className="plan-name">{t('plan.' + p)}</span>
+                        <span className="plan-seats">{t('plan.' + p + '.seats')}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="field">
                   <label htmlFor="name">{t('lbl.yourName')}</label>
                   <input id="name" value={name} onChange={(e) => setName(e.target.value)} required />
                 </div>
@@ -258,6 +309,9 @@ function Auth({ onDone }: { onDone: () => void }) {
                 <li className={/[0-9]/.test(password) ? 'ok' : ''}>{t('pw.number')}</li>
                 <li className={/[^A-Za-z0-9]/.test(password) ? 'ok' : ''}>{t('pw.special')}</li>
               </ul>
+            )}
+            {mode === 'register' && (
+              <div className="trial-notice">🎁 {t('auth.trialNotice')}</div>
             )}
             <button className="btn" disabled={busy}>
               {busy ? t('btn.wait') : mode === 'register' ? t('btn.createClinic') : t('btn.enter')}

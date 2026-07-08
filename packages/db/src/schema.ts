@@ -9,6 +9,13 @@ const createdAt = () =>
 export const clinics = sqliteTable('clinics', {
   id: id(),
   name: text('name').notNull(),
+  // Código de empresa único e legível (ex.: "VTX-9F3A2C1D"), gerado na criação.
+  companyCode: text('company_code'),
+  // Plano contratado, definido pelo tamanho da empresa na criação.
+  plan: text('plan', { enum: ['essencial', 'pro', 'plus'] }).notNull().default('essencial'),
+  // Documento fiscal da empresa/profissional.
+  taxIdType: text('tax_id_type', { enum: ['cnpj', 'cpf'] }),
+  taxId: text('tax_id'),
   isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
   // Ciclo de vida comercial: 'trial' (testando), 'active' (plano pago), 'blocked' (expirado).
   status: text('status', { enum: ['trial', 'active', 'blocked'] }).notNull().default('trial'),

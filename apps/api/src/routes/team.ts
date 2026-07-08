@@ -1,13 +1,14 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import { getDb } from '../lib/db';
 import { users, clinics } from '@vinculo/db/schema';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { hashPassword } from '../lib/password';
 import { sendInviteEmail } from '../lib/email';
 import { audit } from '../lib/audit';
+import { PLAN_LIMITS, type PlanKey } from '../lib/plans';
 import type { AppBindings } from '../types';
 
 export const teamRoutes = new Hono<AppBindings>();
@@ -20,11 +21,15 @@ function randomToken(): string {
 // ---- Rotas do dono da clínica (owner) --------------------------------------
 teamRoutes.get('/', requireAuth, requireRole('owner'), async (c) => {
   const user = c.get('user');
-  const rows = await getDb(c.env)
-    .select()
-    .from(users)
-    .where(eq(users.clinicId, user.clinicId))
-    .all();
+  const db = getDb(c.env);
+  const rows = await db.select().from(users).where(eq(users.clinicId, user.clinicId)).all();
+  const clinic = await db.select().from(clinics).where(eq(clinics.id, user.clinicId)).get();
+  const plan = (clinic?.plan ?? 'essencial') as PlanKey;
+  const usage = { psychologist: 0, secretary: 0 };
+  for (const u of rows) {
+    if (u.role === 'psychologist') usage.psychologist++;
+    else if (u.role === 'secretary') usage.secretary++;
+  }
   return c.json({
     members: rows.map((u) => ({
       id: u.id,
@@ -34,6 +39,9 @@ teamRoutes.get('/', requireAuth, requireRole('owner'), async (c) => {
       isActive: u.isActive,
       mfaEnabled: u.mfaEnabled,
     })),
+    clinic: clinic ? { companyCode: clinic.companyCode, plan } : null,
+    limits: PLAN_LIMITS[plan],
+    usage,
   });
 });
 
@@ -54,6 +62,21 @@ teamRoutes.post('/invite', requireAuth, requireRole('owner'), zValidator('json',
 
   const clinic = await db.select().from(clinics).where(eq(clinics.id, user.clinicId)).get();
   if (!clinic) return c.json({ error: 'not_found' }, 404);
+
+  // Limite de vagas do plano: conta quantos já existem naquele papel (ativos e
+  // convites pendentes contam) e barra se o plano estiver cheio.
+  if (role === 'psychologist' || role === 'secretary') {
+    const plan = (clinic.plan ?? 'essencial') as PlanKey;
+    const limit = PLAN_LIMITS[plan][role];
+    const countRow = await db
+      .select({ n: sql<number>`count(*)` })
+      .from(users)
+      .where(and(eq(users.clinicId, user.clinicId), eq(users.role, role)))
+      .get();
+    if ((countRow?.n ?? 0) >= limit) {
+      return c.json({ error: 'plan_limit_reached', role, limit, plan }, 409);
+    }
+  }
 
   // Cria usuário inativo com hash placeholder (não permite login até ativar).
   const placeholder = await hashPassword(randomToken());

@@ -11,6 +11,7 @@ import TimelineTab from './tabs/TimelineTab';
 import AnaLuizaTab from './tabs/AnaLuizaTab';
 import AnaChat from './AnaChat';
 import TeamPanel from './TeamPanel';
+import { IconTrash, IconArrowLeft, IconChild, IconSparkle } from './icons';
 
 type Tab = 'dados' | 'consulta' | 'ficha' | 'timeline' | 'ana';
 
@@ -33,12 +34,14 @@ function PatientRail({
   onSelect,
   onAdd,
   onOpenTrash,
+  showTrash = true,
 }: {
   patients: Patient[];
   selectedId: string | null;
   onSelect: (id: string) => void;
   onAdd: (fullName: string) => Promise<void>;
   onOpenTrash: () => void;
+  showTrash?: boolean;
 }) {
   const { t } = useI18n();
   const [query, setQuery] = useState('');
@@ -133,9 +136,11 @@ function PatientRail({
           {busy ? '…' : t('btn.add')}
         </button>
       </form>
-      <button className="rail-trash" onClick={onOpenTrash} title={t('trash.title')}>
-        🗑 <span>{t('trash.title')}</span>
-      </button>
+      {showTrash && (
+        <button className="rail-trash" onClick={onOpenTrash} title={t('trash.title')}>
+          <IconTrash size={16} /> <span>{t('trash.title')}</span>
+        </button>
+      )}
     </aside>
   );
 }
@@ -288,7 +293,7 @@ export default function Workspace({ onLogout, onBackToAdmin }: { onLogout: () =>
         <div className="who">
           <Controls />
           {onBackToAdmin && (
-            <button className="ghost" onClick={onBackToAdmin}>← {t('admin.backToAdmin')}</button>
+            <button className="ghost" onClick={onBackToAdmin}><IconArrowLeft size={16} /> {t('admin.backToAdmin')}</button>
           )}
           {user?.role === 'owner' && (
             <button className="ghost" onClick={() => setShowTeam(true)}>{t('team.button')}</button>
@@ -303,12 +308,12 @@ export default function Workspace({ onLogout, onBackToAdmin }: { onLogout: () =>
       {error && <div className="container"><div className="error">{error}</div></div>}
 
       <div className="workspace two">
-        <PatientRail patients={patients} selectedId={selectedId} onSelect={select} onAdd={addPatient} onOpenTrash={openTrash} />
+        <PatientRail patients={patients} selectedId={selectedId} onSelect={select} onAdd={addPatient} onOpenTrash={openTrash} showTrash={!isSecretary} />
 
         {selectedId && patient ? (
           <main className="ws-main">
             <button className="back" onClick={() => setSelectedId(null)}>
-              ← {t('rail.patients')}
+              <IconArrowLeft size={15} /> {t('rail.patients')}
             </button>
 
             <header className="ficha-header">
@@ -328,12 +333,14 @@ export default function Workspace({ onLogout, onBackToAdmin }: { onLogout: () =>
                 </p>
               </div>
               {patient.profile?.personal?.isChild && (
-                <span className="pill child">🧸 {t('hdr.childCare')}</span>
+                <span className="pill child"><IconChild size={13} /> {t('hdr.childCare')}</span>
               )}
               <span className={`pill ${patient.status}`}>{patient.status === 'active' ? t('status.active') : t('status.inactive')}</span>
-              <button className="btn-delete-patient" onClick={() => setConfirmDelete(true)} title={t('patient.delete')}>
-                🗑 {t('patient.delete')}
-              </button>
+              {!isSecretary && (
+                <button className="btn-delete-patient" onClick={() => setConfirmDelete(true)} title={t('patient.delete')}>
+                  <IconTrash size={15} /> {t('patient.delete')}
+                </button>
+              )}
             </header>
 
             <nav className="tabs">
@@ -344,7 +351,7 @@ export default function Workspace({ onLogout, onBackToAdmin }: { onLogout: () =>
                   <button className={tab === 'ficha' ? 'on' : ''} onClick={() => setTab('ficha')}>{t('tab.ficha')}</button>
                   <button className={tab === 'timeline' ? 'on' : ''} onClick={() => setTab('timeline')}>{t('tab.timeline')}</button>
                   <button className={`tab-ana ${tab === 'ana' ? 'on' : ''}`} onClick={() => setTab('ana')}>
-                    <span className="tab-ana-spark">✨</span> {t('tab.ana')}
+                    <IconSparkle size={14} className="tab-ana-spark" /> {t('tab.ana')}
                   </button>
                 </>
               )}
@@ -398,7 +405,7 @@ export default function Workspace({ onLogout, onBackToAdmin }: { onLogout: () =>
       {trashOpen && (
         <div className="modal-overlay" onClick={() => setTrashOpen(false)}>
           <div className="modal-box trash-box" onClick={(e) => e.stopPropagation()}>
-            <h3>🗑 {t('trash.title')}</h3>
+            <h3><IconTrash size={17} /> {t('trash.title')}</h3>
             <p className="trash-sub">{t('trash.subtitle')}</p>
             {trashLoading ? (
               <p className="trash-empty">{t('trash.loading')}</p>

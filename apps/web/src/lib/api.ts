@@ -156,11 +156,18 @@ export const api = {
     req(`/admin/clinics/${clinicId}/activate-plan`, { method: 'POST' }),
   adminExtendTrial: (clinicId: string, days: number): Promise<{ ok: boolean }> =>
     req(`/admin/clinics/${clinicId}/extend-trial`, { method: 'POST', body: JSON.stringify({ days }) }),
+  adminDeleteClinic: (clinicId: string, confirmName: string, mfaCode: string): Promise<{ ok: boolean }> =>
+    req(`/admin/clinics/${clinicId}/delete`, { method: 'POST', body: JSON.stringify({ confirmName, mfaCode }) }),
   adminSearch: (q: string): Promise<{ users: (AdminUser & { clinicId: string; clinicName: string })[]; clinics: { id: string; name: string; isActive: boolean; createdAt: number }[] }> =>
     req(`/admin/search?q=${encodeURIComponent(q)}`),
 
   // --- Equipe da clínica (owner) ---
-  teamList: (): Promise<{ members: TeamMember[] }> => req('/team'),
+  teamList: (): Promise<{
+    members: TeamMember[];
+    clinic: { companyCode: string | null; plan: 'essencial' | 'pro' | 'plus' } | null;
+    limits: { psychologist: number; secretary: number };
+    usage: { psychologist: number; secretary: number };
+  }> => req('/team'),
   teamInvite: (b: { name: string; email: string; role?: string }): Promise<{ ok: boolean; emailSent: boolean }> =>
     req('/team/invite', { method: 'POST', body: JSON.stringify(b) }),
   teamResend: (id: string): Promise<{ ok: boolean }> =>

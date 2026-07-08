@@ -8,6 +8,7 @@ import { clinics, users } from '@vinculo/db/schema';
 import { hashPassword, verifyPassword } from '../lib/password';
 import { sendPasswordResetEmail } from '../lib/email';
 import { audit } from '../lib/audit';
+import { generateCompanyCode, isValidTaxId } from '../lib/plans';
 import { rateLimit, clientIp } from '../lib/ratelimit';
 import {
   newSecret,
@@ -85,6 +86,9 @@ const registerSchema = z.object({
   name: z.string().min(2),
   email: z.string().email(),
   password: strongPassword,
+  plan: z.enum(['essencial', 'pro', 'plus']).default('essencial'),
+  taxIdType: z.enum(['cnpj', 'cpf']),
+  taxId: z.string().min(11).max(20),
 });
 
 // Cria a clínica (tenant) + o usuário dono. Ponto de entrada de uma nova clínica.
@@ -93,17 +97,31 @@ authRoutes.post('/register', zValidator('json', registerSchema), async (c) => {
   if (!(await rateLimit(c.env, `register:${ip}`, 5, 300))) {
     return c.json({ error: 'rate_limited' }, 429);
   }
-  const { clinicName, name, email, password } = c.req.valid('json');
+  const { clinicName, name, email, password, plan, taxIdType, taxId } = c.req.valid('json');
   const db = getDb(c.env);
 
   const existing = await db.select().from(users).where(eq(users.email, email)).get();
   if (existing) return c.json({ error: 'email_in_use' }, 409);
 
+  // Valida o documento fiscal (CPF ou CNPJ) pelos dígitos verificadores.
+  const taxDigits = taxId.replace(/\D/g, '');
+  if (!isValidTaxId(taxIdType, taxDigits)) {
+    return c.json({ error: 'invalid_tax_id' }, 400);
+  }
+
+  // Gera um código de empresa único (com algumas tentativas para evitar colisão).
+  let companyCode = generateCompanyCode();
+  for (let i = 0; i < 5; i++) {
+    const clash = await db.select({ id: clinics.id }).from(clinics).where(eq(clinics.companyCode, companyCode)).get();
+    if (!clash) break;
+    companyCode = generateCompanyCode();
+  }
+
   const TRIAL_DAYS = 7;
   const trialEndsAt = Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000;
   const clinic = await db
     .insert(clinics)
-    .values({ name: clinicName, status: 'trial', trialEndsAt })
+    .values({ name: clinicName, status: 'trial', trialEndsAt, plan, taxIdType, taxId: taxDigits, companyCode })
     .returning()
     .get();
   const passwordHash = await hashPassword(password);

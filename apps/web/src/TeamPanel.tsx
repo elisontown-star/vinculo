@@ -1,10 +1,17 @@
 import { useEffect, useState } from 'react';
 import { api, type TeamMember } from './lib/api';
 import { useI18n } from './i18n';
+import { IconLock, IconCheck, IconClock } from './icons';
 
 export default function TeamPanel({ onClose }: { onClose: () => void }) {
   const { t, te } = useI18n();
   const [members, setMembers] = useState<TeamMember[]>([]);
+  const [info, setInfo] = useState<{
+    companyCode: string | null;
+    plan: 'essencial' | 'pro' | 'plus';
+    limits: { psychologist: number; secretary: number };
+    usage: { psychologist: number; secretary: number };
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [showInvite, setShowInvite] = useState(false);
   const [name, setName] = useState('');
@@ -19,6 +26,7 @@ export default function TeamPanel({ onClose }: { onClose: () => void }) {
     try {
       const r = await api.teamList();
       setMembers(r.members);
+      if (r.clinic) setInfo({ companyCode: r.clinic.companyCode, plan: r.clinic.plan, limits: r.limits, usage: r.usage });
     } catch {
       setError(t('team.loadError'));
     } finally {
@@ -37,7 +45,8 @@ export default function TeamPanel({ onClose }: { onClose: () => void }) {
       setName(''); setEmail(''); setRole('psychologist'); setShowInvite(false);
       load();
     } catch (err) {
-      setError(te(err instanceof Error ? err.message : 'generic'));
+      const code = err instanceof Error ? err.message : 'generic';
+      setError(code === 'plan_limit_reached' ? t('team.planLimit') : te(code));
     } finally {
       setBusy(false);
     }
@@ -71,6 +80,26 @@ export default function TeamPanel({ onClose }: { onClose: () => void }) {
 
         {msg && <div className="admin-msg" onClick={() => setMsg('')}>{msg}</div>}
         {error && <div className="error">{error}</div>}
+
+        {info && (
+          <div className="team-info">
+            <div className="team-info-top">
+              <div>
+                <span className="team-info-label">{t('team.companyCode')}</span>
+                <span className="team-info-code">{info.companyCode ?? '—'}</span>
+              </div>
+              <span className="team-plan-badge">{t('plan.' + info.plan)}</span>
+            </div>
+            <div className="team-seats">
+              <span className={`seat ${info.usage.psychologist >= info.limits.psychologist ? 'full' : ''}`}>
+                {t('team.rolePsychologist')} <b>{info.usage.psychologist}/{info.limits.psychologist}</b>
+              </span>
+              <span className={`seat ${info.usage.secretary >= info.limits.secretary ? 'full' : ''}`}>
+                {t('team.roleSecretary')} <b>{info.usage.secretary}/{info.limits.secretary}</b>
+              </span>
+            </div>
+          </div>
+        )}
 
         {!showInvite && (
           <button className="btn sm" onClick={() => setShowInvite(true)}>+ {t('team.invite')}</button>
@@ -111,7 +140,13 @@ export default function TeamPanel({ onClose }: { onClose: () => void }) {
                   <div className="team-member-name">{m.name} <span className="admin-role">{m.role}</span></div>
                   <div className="team-member-email">{m.email}</div>
                   <div className="team-member-flags">
-                    {m.isActive ? (m.mfaEnabled ? '🔒 ' + t('team.activeMfa') : '✓ ' + t('team.active')) : '⏳ ' + t('team.pending')}
+                    {m.isActive ? (
+                      m.mfaEnabled
+                        ? <span className="flag ok"><IconLock size={13} /> {t('team.activeMfa')}</span>
+                        : <span className="flag ok"><IconCheck size={13} /> {t('team.active')}</span>
+                    ) : (
+                      <span className="flag warn"><IconClock size={13} /> {t('team.pending')}</span>
+                    )}
                   </div>
                 </div>
                 {m.role !== 'owner' && (
