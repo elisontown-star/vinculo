@@ -34,12 +34,14 @@ function PatientRail({
   onSelect,
   onAdd,
   onOpenTrash,
+  showTrash = true,
 }: {
   patients: Patient[];
   selectedId: string | null;
   onSelect: (id: string) => void;
   onAdd: (fullName: string) => Promise<void>;
   onOpenTrash: () => void;
+  showTrash?: boolean;
 }) {
   const { t } = useI18n();
   const [query, setQuery] = useState('');
@@ -134,9 +136,11 @@ function PatientRail({
           {busy ? '…' : t('btn.add')}
         </button>
       </form>
-      <button className="rail-trash" onClick={onOpenTrash} title={t('trash.title')}>
-        <IconTrash size={16} /> <span>{t('trash.title')}</span>
-      </button>
+      {showTrash && (
+        <button className="rail-trash" onClick={onOpenTrash} title={t('trash.title')}>
+          <IconTrash size={16} /> <span>{t('trash.title')}</span>
+        </button>
+      )}
     </aside>
   );
 }
@@ -304,7 +308,7 @@ export default function Workspace({ onLogout, onBackToAdmin }: { onLogout: () =>
       {error && <div className="container"><div className="error">{error}</div></div>}
 
       <div className="workspace two">
-        <PatientRail patients={patients} selectedId={selectedId} onSelect={select} onAdd={addPatient} onOpenTrash={openTrash} />
+        <PatientRail patients={patients} selectedId={selectedId} onSelect={select} onAdd={addPatient} onOpenTrash={openTrash} showTrash={!isSecretary} />
 
         {selectedId && patient ? (
           <main className="ws-main">
@@ -332,9 +336,11 @@ export default function Workspace({ onLogout, onBackToAdmin }: { onLogout: () =>
                 <span className="pill child"><IconChild size={13} /> {t('hdr.childCare')}</span>
               )}
               <span className={`pill ${patient.status}`}>{patient.status === 'active' ? t('status.active') : t('status.inactive')}</span>
-              <button className="btn-delete-patient" onClick={() => setConfirmDelete(true)} title={t('patient.delete')}>
-                <IconTrash size={15} /> {t('patient.delete')}
-              </button>
+              {!isSecretary && (
+                <button className="btn-delete-patient" onClick={() => setConfirmDelete(true)} title={t('patient.delete')}>
+                  <IconTrash size={15} /> {t('patient.delete')}
+                </button>
+              )}
             </header>
 
             <nav className="tabs">
