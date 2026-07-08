@@ -8,6 +8,7 @@ import { clinics, users } from '@vinculo/db/schema';
 import { hashPassword, verifyPassword } from '../lib/password';
 import { sendPasswordResetEmail } from '../lib/email';
 import { audit } from '../lib/audit';
+import { requireAuth } from '../middleware/auth';
 import { generateCompanyCode, isValidTaxId } from '../lib/plans';
 import { rateLimit, clientIp } from '../lib/ratelimit';
 import {
@@ -141,7 +142,7 @@ authRoutes.post('/register', zValidator('json', registerSchema), async (c) => {
 
   // MFA opcional: o novo dono entra direto (pode ativar o MFA depois, se quiser).
   const token = await issueToken(c.env, user);
-  return c.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } }, 201);
+  return c.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role, mfaEnabled: !!user.mfaEnabled } }, 201);
 });
 
 const loginSchema = z.object({ email: z.string().email(), password: z.string() });
@@ -178,14 +179,14 @@ authRoutes.post('/login', zValidator('json', loginSchema), async (c) => {
   // MFA opcional. Se o usuário não ativou MFA, entra direto.
   if (!user.mfaEnabled) {
     const token = await issueToken(c.env, user);
-    return c.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+    return c.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role, mfaEnabled: !!user.mfaEnabled } });
   }
 
   // Dispositivo confiável: se o navegador enviou um deviceToken válido, pula o MFA.
   const deviceToken = c.req.header('X-Device-Token') ?? '';
   if (deviceToken && (await isTrustedDevice(c.env, user.id, deviceToken))) {
     const token = await issueToken(c.env, user);
-    return c.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+    return c.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role, mfaEnabled: !!user.mfaEnabled } });
   }
 
   // MFA ativo: pede o código do app.
@@ -238,8 +239,37 @@ authRoutes.post('/mfa/setup/confirm', zValidator('json', confirmSchema), async (
   return c.json({
     token,
     recoveryCodes: recovery,
-    user: { id: user.id, name: user.name, email: user.email, role: user.role },
+    user: { id: user.id, name: user.name, email: user.email, role: user.role, mfaEnabled: !!user.mfaEnabled },
   });
+});
+
+// ---- MFA opcional: ativar pelo próprio usuário já logado -------------------
+// Usado pelo pop-up "Ativar MFA" (o usuário já tem sessão válida).
+authRoutes.post('/mfa/enable/start', requireAuth, async (c) => {
+  const sess = c.get('user');
+  const db = getDb(c.env);
+  const user = await db.select().from(users).where(eq(users.id, sess.userId)).get();
+  if (!user) return c.json({ error: 'not_found' }, 404);
+  if (user.mfaEnabled) return c.json({ error: 'already_enabled' }, 409);
+  const secret = newSecret();
+  await db.update(users).set({ mfaSecret: secret }).where(eq(users.id, user.id));
+  return c.json({ secret, uri: otpauthUri(secret, user.email) });
+});
+
+const enableConfirmSchema = z.object({ code: z.string().min(6).max(10) });
+authRoutes.post('/mfa/enable/confirm', requireAuth, zValidator('json', enableConfirmSchema), async (c) => {
+  const sess = c.get('user');
+  const db = getDb(c.env);
+  const user = await db.select().from(users).where(eq(users.id, sess.userId)).get();
+  if (!user || !user.mfaSecret) return c.json({ error: 'no_pending_setup' }, 400);
+  const { code } = c.req.valid('json');
+  if (!verifyTotp(user.mfaSecret, code)) return c.json({ error: 'invalid_code' }, 401);
+
+  const recovery = generateRecoveryCodes(8);
+  const hashes = await hashRecoveryCodes(recovery);
+  await db.update(users).set({ mfaEnabled: true, mfaRecoveryCodes: JSON.stringify(hashes) }).where(eq(users.id, user.id));
+  await audit(c.env, { clinicId: user.clinicId, actorUserId: user.id, action: 'mfa_enabled', entity: 'user', entityId: user.id });
+  return c.json({ ok: true, recoveryCodes: recovery });
 });
 
 // ---- MFA: verificar código no login (app ou recuperação) --------------------
@@ -279,7 +309,7 @@ authRoutes.post('/login/mfa', zValidator('json', verifySchema), async (c) => {
   if (trust) deviceToken = await trustDevice(c.env, user.id);
 
   const token = await issueToken(c.env, user);
-  return c.json({ token, deviceToken, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+  return c.json({ token, deviceToken, user: { id: user.id, name: user.name, email: user.email, role: user.role, mfaEnabled: !!user.mfaEnabled } });
 });
 
 // ---- Redefinição de senha por e-mail ---------------------------------------

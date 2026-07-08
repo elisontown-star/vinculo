@@ -191,6 +191,10 @@ export const api = {
     req('/auth/mfa/setup/start', { method: 'POST', headers: { Authorization: `Bearer ${stepToken}` } }),
   mfaSetupConfirm: (stepToken: string, code: string): Promise<{ token: string; recoveryCodes: string[]; user: unknown }> =>
     req('/auth/mfa/setup/confirm', { method: 'POST', headers: { Authorization: `Bearer ${stepToken}` }, body: JSON.stringify({ code }) }),
+  mfaEnableStart: (): Promise<{ secret: string; uri: string }> =>
+    req('/auth/mfa/enable/start', { method: 'POST' }),
+  mfaEnableConfirm: (code: string): Promise<{ ok: boolean; recoveryCodes: string[] }> =>
+    req('/auth/mfa/enable/confirm', { method: 'POST', body: JSON.stringify({ code }) }),
   loginMfa: (challengeToken: string, code: string, trustDevice?: boolean): Promise<{ token: string; deviceToken?: string; user: unknown }> =>
     req('/auth/login/mfa', { method: 'POST', headers: { Authorization: `Bearer ${challengeToken}` }, body: JSON.stringify({ code, trustDevice }) }),
 

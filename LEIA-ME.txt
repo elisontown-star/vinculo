@@ -1,16 +1,20 @@
-VINCULO — MFA opcional (remove obrigatoriedade)
+VINCULO — Pop-up de MFA opcional apos o login
 
-Antes: cadastro e login FORCAVAM configurar o MFA antes de entrar.
-Agora: o usuario entra direto (com email + senha).
-  - Quem JA ativou o MFA (ex.: super admin) continua sendo desafiado
-    normalmente pelo codigo. Nada muda para eles.
-  - Novos usuarios e quem nao tem MFA entram sem a etapa obrigatoria.
+Como funciona:
+ - Ao entrar (email+senha), se o usuario NAO tem MFA, abre um pop-up
+   perguntando se quer ativar.
+ - Botoes: "Ativar MFA" (mostra QR + confirma o codigo + codigos de
+   recuperacao) e "Lembrar daqui 30 dias" (nao mostra de novo por 30 dias).
+ - Quem JA tem MFA nao ve o pop-up e continua sendo desafiado normalmente.
 
-1 arquivo (apps/api/src/routes/auth.ts). Sem migracao. So a API muda.
+5 arquivos. Sem migracao de banco.
+
+IMPORTANTE: contem tanto a API (auth.ts) quanto o front. Este pacote INCLUI
+a mudanca de "MFA opcional" da etapa anterior (auth.ts atualizado).
 
 CMD, na pasta do repo:
   git add .
-  git commit -m "MFA opcional"
+  git commit -m "Pop-up MFA opcional"
   git push
-Depois, publique a API:  cd apps\api  &&  npm run deploy
-(so a API muda, mas nao custa republicar o front tambem)
+Publique a API tambem:  cd apps\api  &&  npm run deploy
+Teste em aba anonima (Ctrl+Shift+R).

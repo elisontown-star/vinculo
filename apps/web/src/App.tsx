@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { api, setToken, clearToken, setUser, getUser } from './lib/api';
 import { useI18n } from './i18n';
 import { Controls } from './Controls';
-import { MfaSetup, MfaChallenge } from './Mfa';
+import { MfaSetup, MfaChallenge, MfaEnablePrompt } from './Mfa';
 import { ForgotPassword } from './ForgotPassword';
 import { AcceptInvite } from './AcceptInvite';
 import Workspace from './Workspace';
@@ -344,6 +344,17 @@ function Auth({ onDone }: { onDone: () => void }) {
 export default function App() {
   const [authed, setAuthed] = useState<boolean>(!!localStorage.getItem('vinculo_token'));
   const [adminView, setAdminView] = useState<'admin' | 'clinic'>('admin');
+  const [mfaPrompt, setMfaPrompt] = useState(false);
+
+  useEffect(() => {
+    if (!authed) {
+      setMfaPrompt(false);
+      return;
+    }
+    const u = getUser() as { mfaEnabled?: boolean } | null;
+    const snooze = Number(localStorage.getItem('vinculo_mfa_snooze') || 0);
+    setMfaPrompt(!!u && !u.mfaEnabled && Date.now() > snooze);
+  }, [authed]);
 
   function logout() {
     clearToken();
@@ -355,12 +366,22 @@ export default function App() {
   if (!authed) return <Auth onDone={() => setAuthed(true)} />;
 
   const user = getUser();
+  let content;
   if (user?.role === 'platform_admin') {
-    if (adminView === 'clinic') {
-      return <Workspace onLogout={logout} onBackToAdmin={() => setAdminView('admin')} />;
-    }
-    return <AdminPanel onLogout={logout} onViewClinic={() => setAdminView('clinic')} />;
+    content =
+      adminView === 'clinic' ? (
+        <Workspace onLogout={logout} onBackToAdmin={() => setAdminView('admin')} />
+      ) : (
+        <AdminPanel onLogout={logout} onViewClinic={() => setAdminView('clinic')} />
+      );
+  } else {
+    content = <Workspace onLogout={logout} />;
   }
 
-  return <Workspace onLogout={logout} />;
+  return (
+    <>
+      {content}
+      {mfaPrompt && <MfaEnablePrompt onClose={() => setMfaPrompt(false)} />}
+    </>
+  );
 }
