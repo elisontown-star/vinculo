@@ -1040,3 +1040,14 @@ body { line-height: 1.55; letter-spacing: -0.005em; }
   .agenda-month, .agenda-mhead-row { grid-template-columns: repeat(7, 1fr); }
   .agenda-mchip { font-size: 9px; }
 }
+
+/* --- Widget de contexto no topo (cidade · temperatura · hora Brasília) ------ */
+.ctx-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.ctx-badge > span:not(:first-child)::before { content: '·'; margin-right: 6px; color: var(--line); }
+.ctx-badge .ctx-city { font-weight: 600; color: var(--ink); }
+.ctx-badge .ctx-temp { font-weight: 600; color: var(--navy); }
+.ctx-badge .ctx-date { text-transform: capitalize; }
+.ctx-badge .ctx-time { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--ink); }
+[data-theme='dark'] .ctx-badge .ctx-temp { color: var(--orange); }
+@media (max-width: 900px) { .ctx-badge .ctx-date { display: none; } }
+@media (max-width: 680px) { .ctx-badge { display: none; } }

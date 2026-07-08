@@ -221,7 +221,9 @@ export const api = {
   appointmentUpdate: (id: string, b: { startsAt?: number; endsAt?: number; status?: string; notes?: string }): Promise<{ ok: boolean }> =>
     req(`/appointments/${id}`, { method: 'PATCH', body: JSON.stringify(b) }),
   appointmentDelete: (id: string): Promise<{ ok: boolean }> =>
-    req(`/appointments/${id}`, { method: 'DELETE' }),  createPatient: (b: Partial<Patient>): Promise<{ patient: Patient }> =>
+    req(`/appointments/${id}`, { method: 'DELETE' }),
+  metaContext: (): Promise<{ city: string | null; region: string | null; country: string | null; temperature: number | null }> =>
+    req('/meta/context'),  createPatient: (b: Partial<Patient>): Promise<{ patient: Patient }> =>
     req('/patients', { method: 'POST', body: JSON.stringify(b) }),
   getPatient: (id: string): Promise<{ patient: Patient }> => req(`/patients/${id}`),
   updatePatient: (id: string, b: PatientUpdate): Promise<{ patient: Patient }> =>

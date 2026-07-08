@@ -12,6 +12,7 @@ import AnaLuizaTab from './tabs/AnaLuizaTab';
 import AnaChat from './AnaChat';
 import TeamPanel from './TeamPanel';
 import AgendaView from './AgendaView';
+import ContextBadge from './ContextBadge';
 import { IconTrash, IconArrowLeft, IconChild, IconSparkle } from './icons';
 
 type Tab = 'dados' | 'consulta' | 'ficha' | 'timeline' | 'ana';
@@ -293,6 +294,7 @@ export default function Workspace({ onLogout, onBackToAdmin }: { onLogout: () =>
       <div className="topbar">
         <Brand />
         <div className="who">
+          <ContextBadge />
           <Controls />
           {onBackToAdmin && (
             <button className="ghost" onClick={onBackToAdmin}><IconArrowLeft size={16} /> {t('admin.backToAdmin')}</button>

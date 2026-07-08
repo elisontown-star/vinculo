@@ -1,17 +1,20 @@
-VINCULO — Agenda: visoes Dia/Semana/Mes + busca
+VINCULO — Widget discreto no topo
 
-Novidades:
- - Alternar entre DIA, SEMANA e MES (botoes no topo direito da agenda).
- - Campo de BUSCA por nome do paciente (filtra a visao atual).
- - Navegacao (< Hoje >) se adapta ao modo (dia/semana/mes).
- - Visao de MES: calendario com os agendamentos por dia; clique num dia
-   para marcar, clique num agendamento para editar.
+Mostra no canto superior: Cidade (pelo IP) . Temperatura . Data e Hora de Brasilia.
+ - Cidade e temperatura: vem da API (geo do Cloudflare + Open-Meteo, sem chave).
+ - Data/hora: fuso America/Sao_Paulo, atualiza sozinho.
+ - Aparece no topo do Workspace e do painel Super Admin.
+ - Em telas estreitas ele some (discreto).
 
-3 arquivos, so o front. Sem migracao, sem mudanca de API.
+7 arquivos (2 novos). MUDA A API (nova rota /meta). Sem migracao.
 
 CMD, na pasta do repo:
   git add .
-  git commit -m "Agenda dia/semana/mes + busca"
+  git commit -m "Widget topo (cidade/hora/clima)"
   git push
-(So o front; nao precisa npm run deploy da API.)
+Publique a API (obrigatorio, tem rota nova):  cd apps\api  &&  npm run deploy
 Teste em aba anonima (Ctrl+Shift+R).
+
+OBS: a cidade e a temperatura sao baseadas no IP de quem acessa
+(detectado pelo Cloudflare). Em rede corporativa/VPN pode mostrar a
+cidade do servidor de saida, nao a fisica.

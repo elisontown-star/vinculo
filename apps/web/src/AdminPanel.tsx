@@ -5,6 +5,7 @@ import { Brand } from './App';
 import { Controls } from './Controls';
 import { IconLock, IconWarning, IconClock, IconCheckCircle, IconBlock } from './icons';
 import { roleLabel } from './roles';
+import ContextBadge from './ContextBadge';
 
 export default function AdminPanel({ onLogout, onViewClinic }: { onLogout: () => void; onViewClinic?: () => void }) {
   const { t } = useI18n();
@@ -210,6 +211,7 @@ export default function AdminPanel({ onLogout, onViewClinic }: { onLogout: () =>
       <div className="topbar">
         <Brand />
         <div className="topbar-right">
+          <ContextBadge />
           <span className="admin-badge">{t('admin.badge')}</span>
           {onViewClinic && (
             <button className="ghost sm" onClick={onViewClinic}>{t('admin.viewClinic')}</button>

@@ -7,6 +7,7 @@ import { patientRoutes } from './routes/patients';
 import { adminRoutes } from './routes/admin';
 import { teamRoutes } from './routes/team';
 import { appointmentRoutes } from './routes/appointments';
+import { metaRoutes } from './routes/meta';
 
 const app = new Hono<AppBindings>();
 
@@ -47,6 +48,7 @@ app.route('/patients', patientRoutes);
 app.route('/admin', adminRoutes);
 app.route('/team', teamRoutes);
 app.route('/appointments', appointmentRoutes);
+app.route('/meta', metaRoutes);
 
 app.notFound((c) => c.json({ error: 'not_found' }, 404));
 
