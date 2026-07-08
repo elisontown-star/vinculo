@@ -11,6 +11,7 @@ import TimelineTab from './tabs/TimelineTab';
 import AnaLuizaTab from './tabs/AnaLuizaTab';
 import AnaChat from './AnaChat';
 import TeamPanel from './TeamPanel';
+import AgendaView from './AgendaView';
 import { IconTrash, IconArrowLeft, IconChild, IconSparkle } from './icons';
 
 type Tab = 'dados' | 'consulta' | 'ficha' | 'timeline' | 'ana';
@@ -157,6 +158,7 @@ export default function Workspace({ onLogout, onBackToAdmin }: { onLogout: () =>
   const [loadingSessions, setLoadingSessions] = useState(false);
   const [loadingEvents, setLoadingEvents] = useState(false);
   const [tab, setTab] = useState<Tab>(getUser()?.role === 'secretary' ? 'dados' : 'consulta');
+  const [topView, setTopView] = useState<'patients' | 'agenda'>('patients');
   const [error, setError] = useState('');
 
   const fmtDate = (ms: number) => new Date(ms).toLocaleDateString(LOCALE[lang], { day: '2-digit', month: 'short', year: 'numeric' });
@@ -295,7 +297,13 @@ export default function Workspace({ onLogout, onBackToAdmin }: { onLogout: () =>
           {onBackToAdmin && (
             <button className="ghost" onClick={onBackToAdmin}><IconArrowLeft size={16} /> {t('admin.backToAdmin')}</button>
           )}
-          {user?.role === 'owner' && (
+          {user?.role !== 'platform_admin' && (
+            <div className="topnav">
+              <button className={topView === 'patients' ? 'on' : ''} onClick={() => setTopView('patients')}>{t('nav.patients')}</button>
+              <button className={topView === 'agenda' ? 'on' : ''} onClick={() => setTopView('agenda')}>{t('nav.agenda')}</button>
+            </div>
+          )}
+          {(user?.role === 'owner' || user?.role === 'psychologist') && (
             <button className="ghost" onClick={() => setShowTeam(true)}>{t('team.button')}</button>
           )}
           <span>{user?.name}</span>
@@ -307,6 +315,9 @@ export default function Workspace({ onLogout, onBackToAdmin }: { onLogout: () =>
 
       {error && <div className="container"><div className="error">{error}</div></div>}
 
+      {topView === 'agenda' ? (
+        <AgendaView />
+      ) : (
       <div className="workspace two">
         <PatientRail patients={patients} selectedId={selectedId} onSelect={select} onAdd={addPatient} onOpenTrash={openTrash} showTrash={!isSecretary} />
 
@@ -401,6 +412,7 @@ export default function Workspace({ onLogout, onBackToAdmin }: { onLogout: () =>
           </div>
         )}
       </div>
+      )}
 
       {trashOpen && (
         <div className="modal-overlay" onClick={() => setTrashOpen(false)}>

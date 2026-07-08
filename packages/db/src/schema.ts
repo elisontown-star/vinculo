@@ -207,6 +207,8 @@ export const appointments = sqliteTable(
     status: text('status', { enum: ['scheduled', 'done', 'canceled', 'no_show'] })
       .notNull()
       .default('scheduled'),
+    notes: text('notes'),
+    googleEventId: text('google_event_id'),
     createdAt: createdAt(),
   },
   (t) => ({

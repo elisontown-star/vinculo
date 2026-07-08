@@ -1,20 +1,49 @@
-VINCULO — Pop-up de MFA opcional apos o login
+================================================================
+  VINCULO — Aba Agenda (calendario semanal)  [Fase 1]
+================================================================
 
-Como funciona:
- - Ao entrar (email+senha), se o usuario NAO tem MFA, abre um pop-up
-   perguntando se quer ativar.
- - Botoes: "Ativar MFA" (mostra QR + confirma o codigo + codigos de
-   recuperacao) e "Lembrar daqui 30 dias" (nao mostra de novo por 30 dias).
- - Quem JA tem MFA nao ve o pop-up e continua sendo desafiado normalmente.
+O QUE ENTRA:
+ - Nova aba "Agenda" no topo (Pacientes | Agenda), da clinica toda.
+ - Visao SEMANAL (7 colunas). Navegar semana anterior/proxima/hoje.
+ - Secretaria e owner: escolhem o psicologo e marcam/veem a agenda dele.
+ - Psicologo: ve a propria agenda.
+ - Marcar (paciente + data + hora + duracao + obs), remarcar, mudar
+   situacao (agendado/realizado/faltou/cancelado) e excluir.
 
-5 arquivos. Sem migracao de banco.
+Arquivos: 9 (3 novos). TEM migracao de banco (campos novos em appointments).
 
-IMPORTANTE: contem tanto a API (auth.ts) quanto o front. Este pacote INCLUI
-a mudanca de "MFA opcional" da etapa anterior (auth.ts atualizado).
+----------------------------------------------------------------
+COMO SUBIR (Windows CMD)
+----------------------------------------------------------------
+1) Extraia por cima do projeto (apps\ e packages\), depois:
+     git add .
+     git commit -m "Aba Agenda"
+     git push
 
-CMD, na pasta do repo:
-  git add .
-  git commit -m "Pop-up MFA opcional"
-  git push
-Publique a API tambem:  cd apps\api  &&  npm run deploy
-Teste em aba anonima (Ctrl+Shift+R).
+2) MIGRACAO DO BANCO (obrigatoria). Como o controle de migracoes do
+   wrangler ficou inconsistente antes, rode DIRETO por comando
+   (dentro de apps\api), em UMA linha:
+
+   wrangler d1 execute vinculo --remote --command "ALTER TABLE appointments ADD notes text; ALTER TABLE appointments ADD google_event_id text;"
+
+   (Se disser que a coluna ja existe, ignore - ja foi aplicada.)
+
+3) Publique a API:  cd apps\api  &&  npm run deploy
+4) Teste em aba anonima (Ctrl+Shift+R).
+
+----------------------------------------------------------------
+FASE 2 — Google Calendar (OAuth)
+----------------------------------------------------------------
+O campo google_event_id ja foi criado para essa fase. Para integrar,
+voce precisa criar credenciais no Google Cloud (Client ID + Secret).
+Quando quiser, me avise que eu te passo o passo a passo e ligo a
+sincronizacao (criar/editar/cancelar eventos no Google do psicologo).
+apps/api/migrations/0007_appointment_calendar.sql
+apps/api/src/index.ts
+apps/api/src/routes/appointments.ts
+apps/web/src/AgendaView.tsx
+apps/web/src/Workspace.tsx
+apps/web/src/index.css
+apps/web/src/lib/api.ts
+apps/web/src/locales.ts
+packages/db/src/schema.ts

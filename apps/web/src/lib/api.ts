@@ -61,6 +61,18 @@ export type Patient = {
   createdAt: number;
 };
 
+export type Appointment = {
+  id: string;
+  patientId: string;
+  psychologistId: string | null;
+  startsAt: number;
+  endsAt: number;
+  status: 'scheduled' | 'done' | 'canceled' | 'no_show';
+  notes?: string | null;
+  patientName?: string | null;
+  psychologistName?: string | null;
+};
+
 export type Session = {
   id: string;
   patientId: string;
@@ -199,7 +211,17 @@ export const api = {
     req('/auth/login/mfa', { method: 'POST', headers: { Authorization: `Bearer ${challengeToken}` }, body: JSON.stringify({ code, trustDevice }) }),
 
   listPatients: (): Promise<{ patients: Patient[] }> => req('/patients'),
-  createPatient: (b: Partial<Patient>): Promise<{ patient: Patient }> =>
+  // --- Agenda / agendamentos ---
+  agendaPsychologists: (): Promise<{ psychologists: { id: string; name: string }[] }> =>
+    req('/appointments/psychologists'),
+  appointmentsList: (from: number, to: number, psychologistId?: string): Promise<{ appointments: Appointment[] }> =>
+    req(`/appointments?from=${from}&to=${to}${psychologistId ? `&psychologistId=${psychologistId}` : ''}`),
+  appointmentCreate: (b: { patientId: string; psychologistId: string; startsAt: number; endsAt: number; notes?: string }): Promise<{ ok: boolean; id: string }> =>
+    req('/appointments', { method: 'POST', body: JSON.stringify(b) }),
+  appointmentUpdate: (id: string, b: { startsAt?: number; endsAt?: number; status?: string; notes?: string }): Promise<{ ok: boolean }> =>
+    req(`/appointments/${id}`, { method: 'PATCH', body: JSON.stringify(b) }),
+  appointmentDelete: (id: string): Promise<{ ok: boolean }> =>
+    req(`/appointments/${id}`, { method: 'DELETE' }),  createPatient: (b: Partial<Patient>): Promise<{ patient: Patient }> =>
     req('/patients', { method: 'POST', body: JSON.stringify(b) }),
   getPatient: (id: string): Promise<{ patient: Patient }> => req(`/patients/${id}`),
   updatePatient: (id: string, b: PatientUpdate): Promise<{ patient: Patient }> =>
