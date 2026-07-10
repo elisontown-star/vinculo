@@ -9,13 +9,14 @@ import ConsultaTab from './tabs/ConsultaTab';
 import FichaTab from './tabs/FichaTab';
 import TimelineTab from './tabs/TimelineTab';
 import AnaLuizaTab from './tabs/AnaLuizaTab';
+import BibliotecaTab from './tabs/BibliotecaTab';
 import AnaChat from './AnaChat';
 import TeamPanel from './TeamPanel';
 import AgendaView from './AgendaView';
 import ContextBadge from './ContextBadge';
 import { IconTrash, IconArrowLeft, IconChild, IconSparkle, IconLock } from './icons';
 
-type Tab = 'dados' | 'consulta' | 'ficha' | 'timeline' | 'ana';
+type Tab = 'dados' | 'consulta' | 'ficha' | 'timeline' | 'ana' | 'biblioteca';
 
 function initials(name: string) {
   return name.trim().split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase() ?? '').join('');
@@ -370,6 +371,9 @@ export default function Workspace({ onLogout, onBackToAdmin }: { onLogout: () =>
                   </button>
                 </>
               )}
+              {(patient.clinicalAccess !== false || isSecretary) && (
+                <button className={tab === 'biblioteca' ? 'on' : ''} onClick={() => setTab('biblioteca')}>{t('tab.biblioteca')}</button>
+              )}
             </nav>
 
             {patient.clinicalAccess === false && !isSecretary && (
@@ -391,6 +395,9 @@ export default function Workspace({ onLogout, onBackToAdmin }: { onLogout: () =>
               )}
               {tab === 'ana' && patient.clinicalAccess !== false && (
                 <AnaLuizaTab key={`a-${patient.id}`} patient={patient} sessions={sessions} events={events} />
+              )}
+              {tab === 'biblioteca' && (patient.clinicalAccess !== false || isSecretary) && (
+                <BibliotecaTab key={`b-${patient.id}`} patientId={patient.id} guiaOnly={isSecretary && patient.clinicalAccess === false} />
               )}
             </div>
 

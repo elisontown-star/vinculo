@@ -213,6 +213,30 @@ export const api = {
     req('/auth/login/mfa', { method: 'POST', headers: { Authorization: `Bearer ${challengeToken}` }, body: JSON.stringify({ code, trustDevice }) }),
 
   listPatients: (): Promise<{ patients: Patient[] }> => req('/patients'),
+  // --- Biblioteca de arquivos do paciente (R2) ---
+  patientFiles: (patientId: string): Promise<{ files: { id: string; category: string; fileName: string; mime: string | null; size: number | null; createdAt: number }[] }> =>
+    req(`/patients/${patientId}/files`),
+  patientFileUpload: async (patientId: string, file: File, category: string): Promise<{ ok: boolean; id: string }> => {
+    const qs = new URLSearchParams({ category, fileName: file.name, mime: file.type || 'application/octet-stream' });
+    const res = await fetch(`${BASE}/patients/${patientId}/files?${qs.toString()}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token()}` },
+      body: file,
+    });
+    if (!res.ok) {
+      let err = 'upload_failed';
+      try { err = (await res.json()).error || err; } catch { /* ignora */ }
+      throw new Error(err);
+    }
+    return res.json();
+  },
+  patientFileBlob: async (patientId: string, fileId: string): Promise<Blob> => {
+    const res = await fetch(`${BASE}/patients/${patientId}/files/${fileId}`, { headers: { Authorization: `Bearer ${token()}` } });
+    if (!res.ok) throw new Error('download_failed');
+    return res.blob();
+  },
+  patientFileDelete: (patientId: string, fileId: string): Promise<{ ok: boolean }> =>
+    req(`/patients/${patientId}/files/${fileId}`, { method: 'DELETE' }),
   // --- Agenda / agendamentos ---
   agendaPsychologists: (): Promise<{ psychologists: { id: string; name: string }[] }> =>
     req('/appointments/psychologists'),

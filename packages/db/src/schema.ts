@@ -295,3 +295,24 @@ export const clinicalShares = sqliteTable(
     grantorIdx: index('clinical_shares_grantor_idx').on(t.grantorId),
   }),
 );
+
+// Biblioteca de arquivos do paciente (receituário, guia, laudo, etc.).
+// Metadados no banco; o arquivo em si fica no R2 (r2Key).
+export const patientFiles = sqliteTable(
+  'patient_files',
+  {
+    id: id(),
+    clinicId: text('clinic_id').notNull().references(() => clinics.id),
+    patientId: text('patient_id').notNull().references(() => patients.id),
+    category: text('category', { enum: ['receituario', 'guia', 'laudo', 'outros'] }).notNull().default('outros'),
+    fileName: text('file_name').notNull(),
+    mime: text('mime'),
+    size: integer('size'),
+    r2Key: text('r2_key').notNull(),
+    uploadedBy: text('uploaded_by'),
+    createdAt: createdAt(),
+  },
+  (t) => ({
+    patientIdx: index('patient_files_patient_idx').on(t.patientId),
+  }),
+);

@@ -1,13 +1,20 @@
-VINCULO — Codigo de empresa no Super Admin
+VINCULO — Biblioteca: secretaria ve apenas Guias
 
-- O codigo de empresa (VTX-XXXXXXXX) agora aparece no portal super admin:
-  na lista de clinicas (abaixo do nome) e no detalhe da clinica.
+- A secretaria agora tem a aba Biblioteca, mas SO com a categoria GUIA
+  (recepcao/convenio): envia, ve e baixa apenas guias.
+- Receituario, laudo e outros continuam so para o psicologo responsavel
+  (e quem tem compartilhamento ativo).
+- Travado no backend (a secretaria recebe 403 se tentar outra categoria).
 
-2 arquivos, so o front. Sem API, sem migracao.
-(O backend ja devolvia o companyCode; so faltava exibir.)
+4 arquivos. MUDA A API (deploy). SEM nova migracao.
+
+IMPORTANTE: este pacote e um incremento da Biblioteca. Se voce ainda
+NAO subiu a Biblioteca (bucket R2 + migracao patient_files), faca aquele
+setup primeiro (zip anterior). O patients.ts deste zip ja inclui tudo.
 
 CMD, na pasta do repo:
   git add .
-  git commit -m "Codigo de empresa no super admin"
+  git commit -m "Biblioteca: secretaria guias"
   git push
+  cd apps\api && npm run deploy
 Teste em aba anonima (Ctrl+Shift+R).
