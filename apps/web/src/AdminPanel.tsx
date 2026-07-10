@@ -312,6 +312,7 @@ export default function AdminPanel({ onLogout, onViewClinic }: { onLogout: () =>
                   onClick={() => openClinic(cl)}
                 >
                   <div className="admin-clinic-name">{cl.name}{!cl.isActive && <em> · {t('admin.disabled')}</em>}</div>
+                  {cl.companyCode && <div className="admin-clinic-code">{cl.companyCode}</div>}
                   <div className="admin-clinic-meta">
                     {cl.users} {t('admin.usersShort')} · {cl.patients} {t('admin.patientsShort')}
                     {cl.status === 'trial' && <span className="admin-tag trial"><IconClock size={13} /> trial</span>}
@@ -343,6 +344,12 @@ export default function AdminPanel({ onLogout, onViewClinic }: { onLogout: () =>
                     </button>
                   </div>
                 </div>
+                {selected.companyCode && (
+                  <div className="admin-company-code">
+                    <span>{t('team.companyCode')}</span>
+                    <code>{selected.companyCode}</code>
+                  </div>
+                )}
                 {selected.status && (
                   <div className={`admin-plan-status ${selected.status}`}>
                     {selected.status === 'trial' && <><IconClock size={16} /> {t('admin.statusTrial').replace('{date}', selected.trialEndsAt ? new Date(selected.trialEndsAt).toLocaleDateString('pt-BR') : '—')}</>}

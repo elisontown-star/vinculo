@@ -1,13 +1,13 @@
-VINCULO — CTA de cadastro (v2, mais profissional)
+VINCULO — Codigo de empresa no Super Admin
 
-- Botao "Criar conta gratis" agora CENTRALIZADO, com BORDA e visual
-  mais limpo. O "7 dias gratis . sem cartao" virou uma linha discreta
-  abaixo do botao (sem o selo sobreposto).
+- O codigo de empresa (VTX-XXXXXXXX) agora aparece no portal super admin:
+  na lista de clinicas (abaixo do nome) e no detalhe da clinica.
 
-3 arquivos, so o front. Sem API, sem migracao.
+2 arquivos, so o front. Sem API, sem migracao.
+(O backend ja devolvia o companyCode; so faltava exibir.)
 
 CMD, na pasta do repo:
   git add .
-  git commit -m "CTA cadastro v2"
+  git commit -m "Codigo de empresa no super admin"
   git push
 Teste em aba anonima (Ctrl+Shift+R).

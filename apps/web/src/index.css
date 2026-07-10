@@ -1082,3 +1082,9 @@ body { line-height: 1.55; letter-spacing: -0.005em; }
 .cta-free:hover { transform: translateY(-1px); box-shadow: 0 10px 22px rgba(245, 130, 31, 0.38); filter: brightness(1.03); }
 .cta-free:active { transform: translateY(0); }
 .cta-free-note { margin-top: 10px; font-size: 12px; color: var(--muted); }
+
+/* --- Código de empresa no super admin -------------------------------------- */
+.admin-company-code { display: inline-flex; align-items: center; gap: 8px; margin: 8px 0 4px; font-size: 12px; color: var(--muted); }
+.admin-company-code span { text-transform: uppercase; letter-spacing: 0.4px; }
+.admin-company-code code { font-family: ui-monospace, Menlo, monospace; font-weight: 700; color: var(--navy); background: var(--navy-tint); padding: 3px 9px; border-radius: 6px; letter-spacing: 0.5px; }
+.admin-clinic-code { font-family: ui-monospace, Menlo, monospace; font-size: 11px; color: var(--orange-deep, #d96d0a); font-weight: 700; margin: 1px 0; letter-spacing: 0.5px; }
