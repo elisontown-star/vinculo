@@ -1065,3 +1065,28 @@ body { line-height: 1.55; letter-spacing: -0.005em; }
 .team-share-list { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .team-share-list li { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 7px 12px; }
 .team-share-received { margin-top: 10px; font-size: 12.5px; color: var(--muted); }
+
+/* --- CTA "Criar conta grátis" (tela de login) ------------------------------ */
+.cta-free-wrap { margin-top: 20px; }
+.cta-divider { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; margin-bottom: 14px; }
+.cta-divider::before, .cta-divider::after { content: ''; height: 1px; background: var(--line); flex: 1; }
+.cta-free {
+  position: relative; width: 100%; border: none; cursor: pointer; border-radius: 14px;
+  padding: 16px 18px 15px; text-align: left; color: #fff;
+  background: linear-gradient(135deg, #f5821f 0%, #ff9d3f 100%);
+  box-shadow: 0 8px 22px rgba(245, 130, 31, 0.35);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  display: flex; flex-direction: column; gap: 3px; overflow: hidden;
+}
+.cta-free::after {
+  content: ''; position: absolute; top: -60%; left: -30%; width: 60%; height: 220%;
+  background: rgba(255, 255, 255, 0.18); transform: rotate(20deg); transition: left 0.5s ease;
+}
+.cta-free:hover { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(245, 130, 31, 0.48); }
+.cta-free:hover::after { left: 130%; }
+.cta-free-badge {
+  position: absolute; top: 13px; right: 14px; background: rgba(255, 255, 255, 0.24); color: #fff;
+  font-size: 11px; font-weight: 700; padding: 3px 11px; border-radius: 999px; letter-spacing: 0.3px;
+}
+.cta-free-main { font-size: 17.5px; font-weight: 800; letter-spacing: -0.2px; }
+.cta-free-sub { font-size: 12.5px; opacity: 0.94; }

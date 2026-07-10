@@ -324,17 +324,20 @@ function Auth({ onDone }: { onDone: () => void }) {
             </button>
           )}
 
-          <div className="switch">
-            {mode === 'register' ? (
-              <>
-                {t('sw.hasAccount')} <button onClick={() => setMode('login')}>{t('sw.enter')}</button>
-              </>
-            ) : (
-              <>
-                {t('sw.newClinic')} <button onClick={() => setMode('register')}>{t('sw.register')}</button>
-              </>
-            )}
-          </div>
+          {mode === 'login' ? (
+            <div className="cta-free-wrap">
+              <div className="cta-divider"><span>{t('cta.new')}</span></div>
+              <button type="button" className="cta-free" onClick={() => setMode('register')}>
+                <span className="cta-free-badge">{t('cta.badge')}</span>
+                <span className="cta-free-main">{t('cta.freeSignup')} →</span>
+                <span className="cta-free-sub">{t('cta.freeSub')}</span>
+              </button>
+            </div>
+          ) : (
+            <div className="switch">
+              {t('sw.hasAccount')} <button onClick={() => setMode('login')}>{t('sw.enter')}</button>
+            </div>
+          )}
         </div>
       </div>
     </div>
