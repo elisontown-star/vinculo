@@ -26,6 +26,11 @@ export default function TeamPanel({ onClose }: { onClose: () => void }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
+  const myId = (me as { id?: string } | null)?.id;
+  const [granted, setGranted] = useState<{ id: string; granteeName: string | null; expiresAt: number | null }[]>([]);
+  const [received, setReceived] = useState<{ id: string; grantorName: string | null; expiresAt: number | null }[]>([]);
+  const [shareGrantee, setShareGrantee] = useState('');
+  const [shareExpiry, setShareExpiry] = useState('');
 
   async function load() {
     setLoading(true);
@@ -33,6 +38,7 @@ export default function TeamPanel({ onClose }: { onClose: () => void }) {
       const r = await api.teamList();
       setMembers(r.members);
       if (r.clinic) setInfo({ companyCode: r.clinic.companyCode, plan: r.clinic.plan, limits: r.limits, usage: r.usage });
+      try { const s = await api.sharesList(); setGranted(s.granted); setReceived(s.received); } catch { /* ignora */ }
     } catch {
       setError(t('team.loadError'));
     } finally {
@@ -94,6 +100,27 @@ export default function TeamPanel({ onClose }: { onClose: () => void }) {
     } catch {
       setError(t('team.actionError'));
     }
+  }
+
+  async function grantShare() {
+    if (!shareGrantee) return;
+    const expiresAt = shareExpiry ? new Date(`${shareExpiry}T23:59:59`).getTime() : null;
+    setBusy(true);
+    setError('');
+    try {
+      await api.shareCreate(shareGrantee, expiresAt);
+      setShareGrantee('');
+      setShareExpiry('');
+      setMsg(t('share.granted'));
+      load();
+    } catch (err) {
+      setError(te(err instanceof Error ? err.message : 'generic'));
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function revokeShare(id: string) {
+    try { await api.shareRevoke(id); load(); } catch { /* ignora */ }
   }
 
   return (
@@ -205,6 +232,35 @@ export default function TeamPanel({ onClose }: { onClose: () => void }) {
                 )}
               </div>
             ))}
+          </div>
+        )}
+        {(isOwner || me?.role === 'psychologist') && (
+          <div className="team-share">
+            <h3 className="team-share-title">{t('share.title')}</h3>
+            <p className="team-share-sub">{t('share.sub')}</p>
+            <div className="team-share-form">
+              <select value={shareGrantee} onChange={(e) => setShareGrantee(e.target.value)}>
+                <option value="">{t('share.pickColleague')}</option>
+                {members.filter((m) => (m.role === 'psychologist' || m.role === 'owner') && m.id !== myId).map((m) => (
+                  <option key={m.id} value={m.id}>{m.name}</option>
+                ))}
+              </select>
+              <input type="date" value={shareExpiry} onChange={(e) => setShareExpiry(e.target.value)} title={t('share.until')} />
+              <button className="btn sm" onClick={grantShare} disabled={busy || !shareGrantee}>{t('share.grant')}</button>
+            </div>
+            {granted.length > 0 && (
+              <ul className="team-share-list">
+                {granted.map((g) => (
+                  <li key={g.id}>
+                    <span>{g.granteeName}{g.expiresAt ? ` · ${t('share.until')} ${new Date(g.expiresAt).toLocaleDateString('pt-BR')}` : ` · ${t('share.noExpiry')}`}</span>
+                    <button className="link-btn" onClick={() => revokeShare(g.id)}>{t('share.revoke')}</button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {received.length > 0 && (
+              <div className="team-share-received">{t('share.receivedFrom')}: {received.map((r) => r.grantorName).filter(Boolean).join(', ')}</div>
+            )}
           </div>
         )}
       </div>

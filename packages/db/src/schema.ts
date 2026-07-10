@@ -191,8 +191,7 @@ export const aiAlerts = sqliteTable(
 );
 
 // 4. Operacional, financeiro e conformidade -------------------------------
-export const appointments = sqliteTable(
-  'appointments',
+export const appointments = sqliteTable(  'appointments',
   {
     id: id(),
     clinicId: text('clinic_id')
@@ -274,5 +273,25 @@ export const auditLog = sqliteTable(
   },
   (t) => ({
     clinicIdx: index('audit_clinic_idx').on(t.clinicId),
+  }),
+);
+
+// Compartilhamento de acesso clínico entre psicólogos (ex.: cobertura de férias).
+// O psicólogo (grantor) libera acesso aos SEUS pacientes para um colega (grantee),
+// opcionalmente com data de expiração.
+export const clinicalShares = sqliteTable(
+  'clinical_shares',
+  {
+    id: id(),
+    clinicId: text('clinic_id').notNull().references(() => clinics.id),
+    grantorId: text('grantor_id').notNull().references(() => users.id),
+    granteeId: text('grantee_id').notNull().references(() => users.id),
+    expiresAt: integer('expires_at', { mode: 'timestamp_ms' }),
+    revokedAt: integer('revoked_at', { mode: 'timestamp_ms' }),
+    createdAt: createdAt(),
+  },
+  (t) => ({
+    granteeIdx: index('clinical_shares_grantee_idx').on(t.granteeId),
+    grantorIdx: index('clinical_shares_grantor_idx').on(t.grantorId),
   }),
 );

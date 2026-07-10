@@ -1051,3 +1051,17 @@ body { line-height: 1.55; letter-spacing: -0.005em; }
 [data-theme='dark'] .ctx-badge .ctx-temp { color: var(--orange); }
 @media (max-width: 900px) { .ctx-badge .ctx-date { display: none; } }
 @media (max-width: 680px) { .ctx-badge { display: none; } }
+
+/* --- Acesso clínico restrito (opção 2) ------------------------------------- */
+.clinical-locked { display: flex; align-items: center; gap: 8px; background: var(--navy-tint); color: var(--navy); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 10px 14px; font-size: 13px; margin: 4px 0 12px; }
+
+/* --- Compartilhamento de pacientes (cobertura) ----------------------------- */
+.team-share { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); }
+.team-share-title { font-size: 15px; font-weight: 700; color: var(--navy); margin: 0 0 4px; }
+.team-share-sub { font-size: 12.5px; color: var(--muted); margin: 0 0 12px; line-height: 1.45; }
+.team-share-form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.team-share-form select, .team-share-form input { padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font-size: 13px; }
+.team-share-form select { flex: 1; min-width: 160px; }
+.team-share-list { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.team-share-list li { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 7px 12px; }
+.team-share-received { margin-top: 10px; font-size: 12.5px; color: var(--muted); }

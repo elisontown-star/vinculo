@@ -13,7 +13,7 @@ import AnaChat from './AnaChat';
 import TeamPanel from './TeamPanel';
 import AgendaView from './AgendaView';
 import ContextBadge from './ContextBadge';
-import { IconTrash, IconArrowLeft, IconChild, IconSparkle } from './icons';
+import { IconTrash, IconArrowLeft, IconChild, IconSparkle, IconLock } from './icons';
 
 type Tab = 'dados' | 'consulta' | 'ficha' | 'timeline' | 'ana';
 
@@ -174,7 +174,9 @@ export default function Workspace({ onLogout, onBackToAdmin }: { onLogout: () =>
   }
   async function loadDetail(id: string) {
     try {
-      setPatient((await api.getPatient(id)).patient);
+      const p = (await api.getPatient(id)).patient;
+      setPatient(p);
+      if (p.clinicalAccess === false) setTab('dados');
     } catch {
       setPatient(null);
     }
@@ -358,7 +360,7 @@ export default function Workspace({ onLogout, onBackToAdmin }: { onLogout: () =>
 
             <nav className="tabs">
               <button className={tab === 'dados' ? 'on' : ''} onClick={() => setTab('dados')}>{t('tab.dados')}</button>
-              {!isSecretary && (
+              {patient.clinicalAccess !== false && (
                 <>
                   <button className={tab === 'consulta' ? 'on' : ''} onClick={() => setTab('consulta')}>{t('tab.consulta')}</button>
                   <button className={tab === 'ficha' ? 'on' : ''} onClick={() => setTab('ficha')}>{t('tab.ficha')}</button>
@@ -370,20 +372,24 @@ export default function Workspace({ onLogout, onBackToAdmin }: { onLogout: () =>
               )}
             </nav>
 
+            {patient.clinicalAccess === false && !isSecretary && (
+              <div className="clinical-locked"><IconLock size={15} /> {t('clinical.restricted').replace('{name}', patient.psychologistName ?? '—')}</div>
+            )}
+
             <div className="tab-body">
               {tab === 'dados' && (
                 <DadosCadastraisTab key={`d-${patient.id}`} patient={patient} onSaved={() => { loadDetail(patient.id); loadPatients(); }} />
               )}
-              {tab === 'consulta' && (
+              {tab === 'consulta' && patient.clinicalAccess !== false && (
                 <ConsultaTab key={`c-${patient.id}`} patientId={patient.id} sessions={sessions} loadingSessions={loadingSessions} onSaved={() => loadSessions(patient.id)} />
               )}
-              {tab === 'ficha' && (
+              {tab === 'ficha' && patient.clinicalAccess !== false && (
                 <FichaTab key={`f-${patient.id}`} patient={patient} onSaved={() => { loadDetail(patient.id); loadPatients(); }} />
               )}
-              {tab === 'timeline' && (
+              {tab === 'timeline' && patient.clinicalAccess !== false && (
                 <TimelineTab key={`t-${patient.id}`} patientId={patient.id} events={events} loading={loadingEvents} onChanged={() => loadEvents(patient.id)} />
               )}
-              {tab === 'ana' && (
+              {tab === 'ana' && patient.clinicalAccess !== false && (
                 <AnaLuizaTab key={`a-${patient.id}`} patient={patient} sessions={sessions} events={events} />
               )}
             </div>
@@ -468,7 +474,7 @@ export default function Workspace({ onLogout, onBackToAdmin }: { onLogout: () =>
 
       {showTeam && <TeamPanel onClose={() => setShowTeam(false)} />}
 
-      {!isSecretary && <AnaChat patientId={selectedId ?? undefined} />}
+      {!isSecretary && patient?.clinicalAccess !== false && <AnaChat patientId={selectedId ?? undefined} />}
     </>
   );
 }

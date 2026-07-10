@@ -1,9 +1,9 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { and, eq, desc, asc, isNull, isNotNull } from 'drizzle-orm';
+import { and, eq, desc, asc, isNull, isNotNull, inArray, gt, or } from 'drizzle-orm';
 import { getDb } from '../lib/db';
-import { patients, sessions, timelineEvents } from '@vinculo/db/schema';
+import { patients, sessions, timelineEvents, clinicalShares } from '@vinculo/db/schema';
 import { ANA_PERSONA, ANA_FULL_ANALYSIS } from '../lib/anaPrompt';
 import { requireAuth } from '../middleware/auth';
 import { audit } from '../lib/audit';
@@ -60,9 +60,33 @@ function serializeSession(s: SessionRow) {
   return { ...s, topics: s.topics ? (JSON.parse(s.topics) as string[]) : [] };
 }
 
-// Garante que o paciente existe E pertence à clínica do usuário.
+// Psicólogos que compartilharam pacientes com o usuário atual (acesso ativo).
+async function activeGrantors(c: any, user: AuthUser): Promise<string[]> {
+  const rows = await getDb(c.env)
+    .select({ grantorId: clinicalShares.grantorId })
+    .from(clinicalShares)
+    .where(and(
+      eq(clinicalShares.clinicId, user.clinicId),
+      eq(clinicalShares.granteeId, user.userId),
+      isNull(clinicalShares.revokedAt),
+      or(isNull(clinicalShares.expiresAt), gt(clinicalShares.expiresAt, new Date())),
+    ))
+    .all();
+  return rows.map((r) => r.grantorId);
+}
+
+// Acesso CLÍNICO a um paciente: apenas o psicólogo responsável, ou quem recebeu
+// compartilhamento ativo. Owner (não responsável), secretária e platform_admin
+// NÃO têm acesso clínico automático (modelo B / opção 2).
+function hasClinicalAccess(user: { userId: string }, patient: { psychologistId: string | null }, grantors: string[]) {
+  if (!patient.psychologistId) return false;
+  return patient.psychologistId === user.userId || grantors.includes(patient.psychologistId);
+}
+
+// Garante que o paciente existe E é visível ao usuário (visão administrativa).
 async function findPatient(c: any, user: AuthUser, id: string) {
-  const vis = visibilityFilter(user);
+  const grantors = await activeGrantors(c, user);
+  const vis = visibilityFilter(user, grantors);
   return getDb(c.env)
     .select()
     .from(patients)
@@ -84,15 +108,28 @@ function patientValues(body: Record<string, any>) {
 // ---- Pacientes -----------------------------------------------------------
 // Regra de visibilidade (modelo B): o dono (owner) vê todos os pacientes da
 // clínica; o psicólogo vê apenas os seus. Retorna a condição extra do WHERE.
-function visibilityFilter(user: { role: string; userId: string }) {
+function visibilityFilter(user: { role: string; userId: string }, grantors: string[] = []) {
   if (user.role === 'owner' || user.role === 'platform_admin' || user.role === 'secretary') return undefined;
-  // psychologist (e demais) veem só os próprios
-  return eq(patients.psychologistId, user.userId);
+  // psychologist: vê os próprios pacientes + os compartilhados com ele
+  return inArray(patients.psychologistId, [user.userId, ...grantors]);
+}
+
+// Middleware para rotas clínicas (consultas, linha do tempo, IA, Ana): só passa
+// quem tem acesso clínico ao paciente do parâmetro :id.
+async function requireClinicalAccess(c: any, next: any) {
+  const user = c.get('user');
+  const id = c.req.param('id');
+  const patient = await findPatient(c, user, id);
+  if (!patient) return c.json({ error: 'not_found' }, 404);
+  const grantors = await activeGrantors(c, user);
+  if (!hasClinicalAccess(user, patient, grantors)) return c.json({ error: 'forbidden_clinical' }, 403);
+  await next();
 }
 
 patientRoutes.get('/', async (c) => {
   const user = c.get('user');
-  const vis = visibilityFilter(user);
+  const grantors = await activeGrantors(c, user);
+  const vis = visibilityFilter(user, grantors);
   const rows = await getDb(c.env)
     .select()
     .from(patients)
@@ -156,8 +193,14 @@ patientRoutes.get('/:id', async (c) => {
   const user = c.get('user');
   const row = await findPatient(c, user, c.req.param('id'));
   if (!row) return c.json({ error: 'not_found' }, 404);
+  const grantors = await activeGrantors(c, user);
+  const clinical = hasClinicalAccess(user, row, grantors);
   const serialized = serializePatient(row);
-  return c.json({ patient: isSecretary(user) ? stripClinical(serialized) : serialized });
+  return c.json({
+    patient: clinical
+      ? { ...serialized, clinicalAccess: true }
+      : { ...stripClinical(serialized), clinicalAccess: false },
+  });
 });
 
 // Atualização da ficha (parcial — tudo opcional).
@@ -169,8 +212,10 @@ patientRoutes.patch('/:id', zValidator('json', updateSchema), async (c) => {
   const existing = await findPatient(c, user, id);
   if (!existing) return c.json({ error: 'not_found' }, 404);
   const input = c.req.valid('json');
-  // Secretária não pode gravar dados clínicos: preserva o profile clínico existente.
-  if (isSecretary(user) && input.profile) {
+  // Sem acesso clínico (secretária, ou owner em paciente de outro psicólogo):
+  // não pode gravar dados clínicos — preserva o profile clínico existente.
+  const grantors = await activeGrantors(c, user);
+  if (!hasClinicalAccess(user, existing, grantors) && input.profile) {
     const current = existing.profile ? JSON.parse(existing.profile) : {};
     const incoming = { ...input.profile };
     for (const k of CLINICAL_KEYS) {
@@ -198,7 +243,7 @@ patientRoutes.patch('/:id', zValidator('json', updateSchema), async (c) => {
 });
 
 // ---- Consultas -----------------------------------------------------------
-patientRoutes.get('/:id/sessions', blockSecretary, async (c) => {
+patientRoutes.get('/:id/sessions', requireClinicalAccess, async (c) => {
   const user = c.get('user');
   const id = c.req.param('id');
   if (!(await findPatient(c, user, id))) return c.json({ error: 'not_found' }, 404);
@@ -224,7 +269,7 @@ const sessionSchema = z.object({
   freeNotes: z.string().optional(),
 });
 
-patientRoutes.post('/:id/sessions', blockSecretary, zValidator('json', sessionSchema), async (c) => {
+patientRoutes.post('/:id/sessions', requireClinicalAccess, zValidator('json', sessionSchema), async (c) => {
   const user = c.get('user');
   const id = c.req.param('id');
   if (!(await findPatient(c, user, id))) return c.json({ error: 'not_found' }, 404);
@@ -262,7 +307,7 @@ patientRoutes.post('/:id/sessions', blockSecretary, zValidator('json', sessionSc
 
 // ---- Linha do tempo ------------------------------------------------------
 // Entradas manuais agora; a IA vai sugerir eventos (status "suggested") na Etapa 2.
-patientRoutes.get('/:id/timeline', blockSecretary, async (c) => {
+patientRoutes.get('/:id/timeline', requireClinicalAccess, async (c) => {
   const user = c.get('user');
   const id = c.req.param('id');
   if (!(await findPatient(c, user, id))) return c.json({ error: 'not_found' }, 404);
@@ -283,7 +328,7 @@ const eventSchema = z.object({
   category: z.string().optional(),
 });
 
-patientRoutes.post('/:id/timeline', blockSecretary, zValidator('json', eventSchema), async (c) => {
+patientRoutes.post('/:id/timeline', requireClinicalAccess, zValidator('json', eventSchema), async (c) => {
   const user = c.get('user');
   const id = c.req.param('id');
   if (!(await findPatient(c, user, id))) return c.json({ error: 'not_found' }, 404);
@@ -317,7 +362,7 @@ patientRoutes.post('/:id/timeline', blockSecretary, zValidator('json', eventSche
   return c.json({ event: row }, 201);
 });
 
-patientRoutes.delete('/:id/timeline/:eventId', async (c) => {
+patientRoutes.delete('/:id/timeline/:eventId', requireClinicalAccess, async (c) => {
   const user = c.get('user');
   const id = c.req.param('id');
   if (!(await findPatient(c, user, id))) return c.json({ error: 'not_found' }, 404);
@@ -485,7 +530,7 @@ function buildPatientContext(patient: any, sess: any[], events: any[]): string {
   return parts.join('\n');
 }
 
-patientRoutes.get('/:id/ai-questions', blockSecretary, async (c) => {
+patientRoutes.get('/:id/ai-questions', requireClinicalAccess, async (c) => {
   const user = c.get('user');
   const id = c.req.param('id');
   const patientRow = await findPatient(c, user, id);
@@ -668,6 +713,14 @@ patientRoutes.post('/ana-chat', blockSecretary, zValidator('json', chatSchema), 
   try {
   const user = c.get('user');
   const { patientId, messages } = c.req.valid('json');
+
+  // Sem acesso clínico ao paciente informado, a Ana não responde sobre ele.
+  if (patientId) {
+    const p = await findPatient(c, user, patientId);
+    if (!p) return c.json({ error: 'not_found' }, 404);
+    const grantors = await activeGrantors(c, user);
+    if (!hasClinicalAccess(user, p, grantors)) return c.json({ error: 'forbidden_clinical' }, 403);
+  }
 
   let patientContext = '';
 

@@ -1,20 +1,52 @@
-VINCULO — Widget discreto no topo
+================================================================
+  VINCULO — Acesso clinico (Opcao 2) + Compartilhamento
+================================================================
 
-Mostra no canto superior: Cidade (pelo IP) . Temperatura . Data e Hora de Brasilia.
- - Cidade e temperatura: vem da API (geo do Cloudflare + Open-Meteo, sem chave).
- - Data/hora: fuso America/Sao_Paulo, atualiza sozinho.
- - Aparece no topo do Workspace e do painel Super Admin.
- - Em telas estreitas ele some (discreto).
+REGRA (opcao 2 / modelo B):
+ - O OWNER continua vendo a LISTA de todos os pacientes (gestao) e os
+   dados cadastrais, MAS nao tem acesso ao conteudo CLINICO (Consulta,
+   Ficha, Linha do tempo, Ana) dos pacientes de OUTROS psicologos.
+ - Cada psicologo ve o conteudo clinico so dos SEUS pacientes.
+ - Secretaria: inalterada (dados cadastrais, sem clinico).
 
-7 arquivos (2 novos). MUDA A API (nova rota /meta). Sem migracao.
+COMPARTILHAMENTO (cobertura de ferias):
+ - No painel Equipe, o psicologo pode "Compartilhar" seus pacientes com
+   um colega, com data de validade opcional. Passou a data, fecha sozinho.
+ - Da pra revogar a qualquer momento. Enquanto ativo, o colega ve o
+   clinico daqueles pacientes (e eles aparecem na lista dele).
 
-CMD, na pasta do repo:
-  git add .
-  git commit -m "Widget topo (cidade/hora/clima)"
-  git push
-Publique a API (obrigatorio, tem rota nova):  cd apps\api  &&  npm run deploy
-Teste em aba anonima (Ctrl+Shift+R).
+Arquivos: 11 (novos: 0008_clinical_shares.sql, shares.ts).
+Inclui meta.ts por seguranca (o index.ts referencia ele).
+TEM migracao de banco. MUDA A API.
 
-OBS: a cidade e a temperatura sao baseadas no IP de quem acessa
-(detectado pelo Cloudflare). Em rede corporativa/VPN pode mostrar a
-cidade do servidor de saida, nao a fisica.
+----------------------------------------------------------------
+COMO SUBIR (Windows CMD)
+----------------------------------------------------------------
+1) Extraia por cima do projeto, depois:
+     git add .
+     git commit -m "Acesso clinico + compartilhamento"
+     git push
+
+2) MIGRACAO (cria a tabela). Rode direto por comando (uma linha),
+   dentro de apps\api:
+
+wrangler d1 execute vinculo --remote --command "CREATE TABLE clinical_shares (id text PRIMARY KEY NOT NULL, clinic_id text NOT NULL, grantor_id text NOT NULL, grantee_id text NOT NULL, expires_at integer, revoked_at integer, created_at integer NOT NULL); CREATE INDEX clinical_shares_grantee_idx ON clinical_shares (grantee_id); CREATE INDEX clinical_shares_grantor_idx ON clinical_shares (grantor_id);"
+
+   (Se disser que a tabela ja existe, ignore.)
+
+3) Publique a API:  cd apps\api  &&  npm run deploy
+4) Teste em aba anonima (Ctrl+Shift+R).
+
+OBS: este pacote assume que voce ja subiu os zips anteriores
+(agenda, widget). O meta.ts vai incluso para o build da API nao quebrar.
+apps/api/migrations/0008_clinical_shares.sql
+apps/api/src/index.ts
+apps/api/src/routes/meta.ts
+apps/api/src/routes/patients.ts
+apps/api/src/routes/shares.ts
+apps/web/src/TeamPanel.tsx
+apps/web/src/Workspace.tsx
+apps/web/src/index.css
+apps/web/src/lib/api.ts
+apps/web/src/locales.ts
+packages/db/src/schema.ts

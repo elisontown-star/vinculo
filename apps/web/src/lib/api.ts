@@ -59,6 +59,8 @@ export type Patient = {
   profile?: Profile;
   deletedAt?: number | null;
   createdAt: number;
+  clinicalAccess?: boolean;
+  psychologistName?: string | null;
 };
 
 export type Appointment = {
@@ -223,7 +225,14 @@ export const api = {
   appointmentDelete: (id: string): Promise<{ ok: boolean }> =>
     req(`/appointments/${id}`, { method: 'DELETE' }),
   metaContext: (): Promise<{ city: string | null; region: string | null; country: string | null; temperature: number | null }> =>
-    req('/meta/context'),  createPatient: (b: Partial<Patient>): Promise<{ patient: Patient }> =>
+    req('/meta/context'),
+  // --- Compartilhamento de acesso clínico (cobertura) ---
+  sharesList: (): Promise<{ granted: { id: string; granteeName: string | null; expiresAt: number | null }[]; received: { id: string; grantorName: string | null; expiresAt: number | null }[] }> =>
+    req('/shares'),
+  shareCreate: (granteeId: string, expiresAt: number | null): Promise<{ ok: boolean; id: string }> =>
+    req('/shares', { method: 'POST', body: JSON.stringify({ granteeId, expiresAt }) }),
+  shareRevoke: (id: string): Promise<{ ok: boolean }> =>
+    req(`/shares/${id}`, { method: 'DELETE' }),  createPatient: (b: Partial<Patient>): Promise<{ patient: Patient }> =>
     req('/patients', { method: 'POST', body: JSON.stringify(b) }),
   getPatient: (id: string): Promise<{ patient: Patient }> => req(`/patients/${id}`),
   updatePatient: (id: string, b: PatientUpdate): Promise<{ patient: Patient }> =>
