@@ -636,50 +636,23 @@ patientRoutes.get('/:id/ai-questions', requireClinicalAccess, async (c) => {
 const FILE_CATEGORIES = ['receituario', 'guia', 'laudo', 'outros'];
 const MAX_FILE_BYTES = 15 * 1024 * 1024; // 15 MB (limite de sanidade)
 
-// Nível de acesso à biblioteca de um paciente:
-//  'full'  -> psicólogo responsável ou compartilhamento ativo (todas as categorias)
-//  'guia'  -> secretária (apenas guias — recepção/convênio)
-//  'none'  -> sem acesso
-async function bibliotecaLevel(c: any, user: AuthUser, patient: { psychologistId: string | null }): Promise<'full' | 'guia' | 'none'> {
-  const grantors = await activeGrantors(c, user);
-  if (hasClinicalAccess(user, patient, grantors)) return 'full';
-  if (user.role === 'secretary') return 'guia';
-  return 'none';
-}
-
-patientRoutes.get('/:id/files', async (c) => {
-  const user = c.get('user');
+patientRoutes.get('/:id/files', requireClinicalAccess, async (c) => {
   const id = c.req.param('id');
-  const patient = await findPatient(c, user, id);
-  if (!patient) return c.json({ error: 'not_found' }, 404);
-  const level = await bibliotecaLevel(c, user, patient);
-  if (level === 'none') return c.json({ error: 'forbidden_clinical' }, 403);
-
-  const where = level === 'guia'
-    ? and(eq(patientFiles.patientId, id), eq(patientFiles.category, 'guia'))
-    : eq(patientFiles.patientId, id);
   const rows = await getDb(c.env)
     .select({ id: patientFiles.id, category: patientFiles.category, fileName: patientFiles.fileName, mime: patientFiles.mime, size: patientFiles.size, createdAt: patientFiles.createdAt })
     .from(patientFiles)
-    .where(where)
+    .where(eq(patientFiles.patientId, id))
     .orderBy(desc(patientFiles.createdAt))
     .all();
-  return c.json({ files: rows, level });
+  return c.json({ files: rows });
 });
 
 // Upload: o arquivo vai no CORPO (binário); metadados na query string.
-patientRoutes.post('/:id/files', async (c) => {
+patientRoutes.post('/:id/files', requireClinicalAccess, async (c) => {
   const user = c.get('user');
   const id = c.req.param('id');
-  const patient = await findPatient(c, user, id);
-  if (!patient) return c.json({ error: 'not_found' }, 404);
-  const level = await bibliotecaLevel(c, user, patient);
-  if (level === 'none') return c.json({ error: 'forbidden_clinical' }, 403);
-
   const catRaw = c.req.query('category') || 'outros';
   const category = (FILE_CATEGORIES.includes(catRaw) ? catRaw : 'outros') as 'receituario' | 'guia' | 'laudo' | 'outros';
-  // Secretária só pode enviar guias.
-  if (level === 'guia' && category !== 'guia') return c.json({ error: 'forbidden_category' }, 403);
   const fileName = (c.req.query('fileName') || 'arquivo').slice(0, 200);
   const mime = (c.req.query('mime') || 'application/octet-stream').slice(0, 120);
 
@@ -700,18 +673,11 @@ patientRoutes.post('/:id/files', async (c) => {
 });
 
 // Download: transmite os bytes direto do R2.
-patientRoutes.get('/:id/files/:fileId', async (c) => {
-  const user = c.get('user');
+patientRoutes.get('/:id/files/:fileId', requireClinicalAccess, async (c) => {
   const id = c.req.param('id');
   const fileId = c.req.param('fileId');
-  const patient = await findPatient(c, user, id);
-  if (!patient) return c.json({ error: 'not_found' }, 404);
-  const level = await bibliotecaLevel(c, user, patient);
-  if (level === 'none') return c.json({ error: 'forbidden_clinical' }, 403);
-
   const row = await getDb(c.env).select().from(patientFiles).where(and(eq(patientFiles.id, fileId), eq(patientFiles.patientId, id))).get();
   if (!row) return c.json({ error: 'not_found' }, 404);
-  if (level === 'guia' && row.category !== 'guia') return c.json({ error: 'forbidden_category' }, 403);
   const obj = await c.env.DOCS.get(row.r2Key);
   if (!obj) return c.json({ error: 'not_found' }, 404);
   return new Response(obj.body, {
@@ -722,19 +688,12 @@ patientRoutes.get('/:id/files/:fileId', async (c) => {
   });
 });
 
-patientRoutes.delete('/:id/files/:fileId', async (c) => {
+patientRoutes.delete('/:id/files/:fileId', requireClinicalAccess, async (c) => {
   const user = c.get('user');
   const id = c.req.param('id');
   const fileId = c.req.param('fileId');
-  const patient = await findPatient(c, user, id);
-  if (!patient) return c.json({ error: 'not_found' }, 404);
-  const level = await bibliotecaLevel(c, user, patient);
-  if (level === 'none') return c.json({ error: 'forbidden_clinical' }, 403);
-
-  const row = await getDb(c.env).select({ r2Key: patientFiles.r2Key, category: patientFiles.category }).from(patientFiles).where(and(eq(patientFiles.id, fileId), eq(patientFiles.patientId, id))).get();
-  if (!row) return c.json({ error: 'not_found' }, 404);
-  if (level === 'guia' && row.category !== 'guia') return c.json({ error: 'forbidden_category' }, 403);
-  try { await c.env.DOCS.delete(row.r2Key); } catch { /* ignora */ }
+  const row = await getDb(c.env).select({ r2Key: patientFiles.r2Key }).from(patientFiles).where(and(eq(patientFiles.id, fileId), eq(patientFiles.patientId, id))).get();
+  if (row) { try { await c.env.DOCS.delete(row.r2Key); } catch { /* ignora */ } }
   await getDb(c.env).delete(patientFiles).where(and(eq(patientFiles.id, fileId), eq(patientFiles.patientId, id)));
   await audit(c.env, { clinicId: user.clinicId, actorUserId: user.userId, action: 'file_deleted', entity: 'patient_file', entityId: fileId });
   return c.json({ ok: true });
