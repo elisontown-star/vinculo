@@ -31,5 +31,10 @@
   ],
 
   // Workers AI — usado pela Ana Luiza para sugerir perguntas de sessão.
-  "ai": { "binding": "AI" }
+  "ai": { "binding": "AI" },
+
+  // Armazenamento de arquivos (biblioteca do paciente: receituários, guias, laudos).
+  "r2_buckets": [
+    { "binding": "DOCS", "bucket_name": "vinculo-docs" }
+  ]
 }
