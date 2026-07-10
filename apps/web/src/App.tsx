@@ -328,10 +328,9 @@ function Auth({ onDone }: { onDone: () => void }) {
             <div className="cta-free-wrap">
               <div className="cta-divider"><span>{t('cta.new')}</span></div>
               <button type="button" className="cta-free" onClick={() => setMode('register')}>
-                <span className="cta-free-badge">{t('cta.badge')}</span>
-                <span className="cta-free-main">{t('cta.freeSignup')} →</span>
-                <span className="cta-free-sub">{t('cta.freeSub')}</span>
+                {t('cta.freeSignup')} →
               </button>
+              <div className="cta-free-note">{t('cta.badge')} · {t('cta.freeSub')}</div>
             </div>
           ) : (
             <div className="switch">

@@ -1,14 +1,13 @@
-VINCULO — CTA "Criar conta gratis" na tela de login
+VINCULO — CTA de cadastro (v2, mais profissional)
 
-- Botao grande e chamativo (laranja, com selo "7 dias gratis" e
-  "sem cartao de credito") na tela de login, que leva ao cadastro.
-- Efeito de brilho no hover.
+- Botao "Criar conta gratis" agora CENTRALIZADO, com BORDA e visual
+  mais limpo. O "7 dias gratis . sem cartao" virou uma linha discreta
+  abaixo do botao (sem o selo sobreposto).
 
 3 arquivos, so o front. Sem API, sem migracao.
 
 CMD, na pasta do repo:
   git add .
-  git commit -m "CTA criar conta gratis"
+  git commit -m "CTA cadastro v2"
   git push
-(So o front; nao precisa deploy da API.)
 Teste em aba anonima (Ctrl+Shift+R).
