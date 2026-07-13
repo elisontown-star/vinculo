@@ -2,6 +2,17 @@ import { createMiddleware } from 'hono/factory';
 import { verify } from 'hono/jwt';
 import type { AppBindings } from '../types';
 
+// Garante que o usuário autenticado tem um dos papéis permitidos.
+export function requireRole(...roles: string[]) {
+  return createMiddleware<AppBindings>(async (c, next) => {
+    const user = c.get('user');
+    if (!user || !roles.includes(user.role)) {
+      return c.json({ error: 'forbidden' }, 403);
+    }
+    await next();
+  });
+}
+
 // Exige um JWT válido e injeta o usuário (com clinicId) no contexto.
 // Também valida tokenVersion contra o banco para suportar revogação de sessões.
 export const requireAuth = createMiddleware<AppBindings>(async (c, next) => {
