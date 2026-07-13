@@ -1,9 +1,9 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { and, eq, desc, asc, isNull, isNotNull, inArray, gt, or } from 'drizzle-orm';
+import { and, eq, desc, asc, isNull, isNotNull, inArray, gt, gte, lte, or } from 'drizzle-orm';
 import { getDb } from '../lib/db';
-import { patients, sessions, timelineEvents, clinicalShares, patientFiles } from '@vinculo/db/schema';
+import { patients, sessions, timelineEvents, clinicalShares, patientFiles, appointments } from '@vinculo/db/schema';
 import { ANA_PERSONA, ANA_FULL_ANALYSIS } from '../lib/anaPrompt';
 import { requireAuth } from '../middleware/auth';
 import { audit } from '../lib/audit';
@@ -350,7 +350,54 @@ patientRoutes.post('/:id/sessions', zValidator('json', sessionSchema), async (c)
     entity: 'session',
     entityId: row.id,
   });
+
+  // Auto-completar o agendamento mais próximo do horário da consulta (±90 min).
+  if (body.occurredAt) {
+    const targetMs = new Date(body.occurredAt).getTime();
+    const windowMs = 90 * 60 * 1000;
+    const nearbyAppt = await getDb(c.env)
+      .select({ id: appointments.id })
+      .from(appointments)
+      .where(and(
+        eq(appointments.patientId, id),
+        eq(appointments.clinicId, user.clinicId),
+        eq(appointments.status, 'scheduled'),
+        gte(appointments.startsAt, new Date(targetMs - windowMs)),
+        lte(appointments.startsAt, new Date(targetMs + windowMs)),
+      ))
+      .get();
+    if (nearbyAppt) {
+      await getDb(c.env)
+        .update(appointments)
+        .set({ status: 'done' })
+        .where(eq(appointments.id, nearbyAppt.id));
+    }
+  }
+
   return c.json({ session: serializeSession(row) }, 201);
+});
+
+// ---- Agendamentos futuros do paciente (para pré-preencher consulta) ----------
+patientRoutes.get('/:id/upcoming-appointments', async (c) => {
+  const user = c.get('user');
+  const id = c.req.param('id');
+  if (!(await findPatient(c, user, id))) return c.json({ error: 'not_found' }, 404);
+  const now = new Date();
+  const future = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const rows = await getDb(c.env)
+    .select({ id: appointments.id, startsAt: appointments.startsAt, endsAt: appointments.endsAt, notes: appointments.notes })
+    .from(appointments)
+    .where(and(
+      eq(appointments.patientId, id),
+      eq(appointments.clinicId, user.clinicId),
+      eq(appointments.status, 'scheduled'),
+      gte(appointments.startsAt, now),
+      lte(appointments.startsAt, future),
+    ))
+    .orderBy(asc(appointments.startsAt))
+    .all();
+  const toMs = (v: unknown) => (v instanceof Date ? v.getTime() : Number(v));
+  return c.json({ appointments: rows.map((r) => ({ ...r, startsAt: toMs(r.startsAt), endsAt: toMs(r.endsAt) })) });
 });
 
 // ---- Linha do tempo ------------------------------------------------------

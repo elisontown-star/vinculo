@@ -1,7 +1,9 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { api, getUser, type Session, type NewSession } from '../lib/api';
 import { useI18n } from '../i18n';
 import { LOCALE } from '../locales';
+
+type UpcomingAppt = { id: string; startsAt: number; endsAt: number; notes?: string | null };
 
 // ── Utils ─────────────────────────────────────────────────────────────────────
 function nowLocal() {
@@ -59,16 +61,53 @@ function TopicInput({ topics, onChange }: { topics: string[]; onChange: (t: stri
   );
 }
 
+// ── Seletor de agendamento pendente ──────────────────────────────────────────
+function ApptPicker({ patientId, onPick }: { patientId: string; onPick: (appt: UpcomingAppt) => void }) {
+  const [appts, setAppts] = useState<UpcomingAppt[]>([]);
+  const { lang } = useI18n();
+  useEffect(() => {
+    api.patientUpcomingAppointments(patientId).then((r) => setAppts(r.appointments)).catch(() => {});
+  }, [patientId]);
+  if (appts.length === 0) return null;
+  const locale = LOCALE[lang as keyof typeof LOCALE];
+  return (
+    <div className="appt-picker">
+      <span className="appt-picker-label">Agendamentos pendentes:</span>
+      {appts.map((a) => {
+        const start = new Date(a.startsAt);
+        const durMin = Math.round((a.endsAt - a.startsAt) / 60000);
+        const label = start.toLocaleString(locale, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) + ` · ${durMin} min`;
+        return (
+          <button key={a.id} type="button" className="appt-pill" onClick={() => onPick(a)}>
+            📅 {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── Formulário clínico completo (psicólogo / owner) ───────────────────────────
-function FullForm({ patientId, onSaved }: { patientId: string; onSaved: () => void }) {
+function FullForm({ patientId, onSaved, prefill }: { patientId: string; onSaved: () => void; prefill?: { occurredAt?: string; durationMin?: number } }) {
   const { t, o, te } = useI18n();
-  const [form, setForm] = useState<NewSession & { occurredAt: string }>({ occurredAt: nowLocal(), topics: [] });
+  const [form, setForm] = useState<NewSession & { occurredAt: string }>({
+    occurredAt: prefill?.occurredAt ?? nowLocal(),
+    durationMin: prefill?.durationMin,
+    topics: [],
+  });
   const [scale, setScale] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
   function set<K extends keyof NewSession>(k: K, v: NewSession[K]) {
     setForm((f) => ({ ...f, [k]: v }));
+  }
+
+  function fillFromAppt(appt: UpcomingAppt) {
+    const d = new Date(appt.startsAt);
+    const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    const dur = Math.round((appt.endsAt - appt.startsAt) / 60000);
+    setForm((f) => ({ ...f, occurredAt: local, durationMin: dur }));
   }
 
   async function save(e: React.FormEvent) {
@@ -94,6 +133,8 @@ function FullForm({ patientId, onSaved }: { patientId: string; onSaved: () => vo
   return (
     <form className="session-form panel" onSubmit={save}>
       {error && <div className="error">{error}</div>}
+
+      <ApptPicker patientId={patientId} onPick={fillFromAppt} />
 
       <div className="row2">
         <div className="field">
@@ -171,10 +212,10 @@ function FullForm({ patientId, onSaved }: { patientId: string; onSaved: () => vo
 }
 
 // ── Formulário simplificado (secretária) ──────────────────────────────────────
-function SecretaryForm({ patientId, onSaved }: { patientId: string; onSaved: () => void }) {
+function SecretaryForm({ patientId, onSaved, prefill }: { patientId: string; onSaved: () => void; prefill?: { occurredAt?: string; durationMin?: number } }) {
   const { t, te } = useI18n();
-  const [occurredAt, setOccurredAt] = useState(nowLocal());
-  const [durationMin, setDurationMin] = useState<number | undefined>(undefined);
+  const [occurredAt, setOccurredAt] = useState(prefill?.occurredAt ?? nowLocal());
+  const [durationMin, setDurationMin] = useState<number | undefined>(prefill?.durationMin);
   const [freeNotes, setFreeNotes] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -200,10 +241,19 @@ function SecretaryForm({ patientId, onSaved }: { patientId: string; onSaved: () 
     }
   }
 
+  function fillFromAppt(appt: UpcomingAppt) {
+    const d = new Date(appt.startsAt);
+    const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    setOccurredAt(local);
+    setDurationMin(Math.round((appt.endsAt - appt.startsAt) / 60000));
+  }
+
   return (
     <form className="session-form panel" onSubmit={save}>
       {error && <div className="error">{error}</div>}
       <div className="secretary-note">{t('c.secretaryNote')}</div>
+
+      <ApptPicker patientId={patientId} onPick={fillFromAppt} />
 
       <div className="row2">
         <div className="field">
@@ -442,16 +492,20 @@ export default function ConsultaTab({
   sessions,
   loadingSessions,
   onSaved,
+  defaultMode,
+  prefill,
 }: {
   patientId: string;
   sessions: Session[];
   loadingSessions: boolean;
   onSaved: () => void;
+  defaultMode?: 'form' | 'history';
+  prefill?: { occurredAt?: string; durationMin?: number };
 }) {
   const { t } = useI18n();
   const user = getUser();
   const isSecretary = user?.role === 'secretary';
-  const [mode, setMode] = useState<'form' | 'history'>('history');
+  const [mode, setMode] = useState<'form' | 'history'>(defaultMode ?? 'history');
 
   function handleSaved() {
     onSaved();
@@ -489,8 +543,8 @@ export default function ConsultaTab({
       {/* Conteúdo */}
       {mode === 'form' && (
         isSecretary
-          ? <SecretaryForm patientId={patientId} onSaved={handleSaved} />
-          : <FullForm patientId={patientId} onSaved={handleSaved} />
+          ? <SecretaryForm patientId={patientId} onSaved={handleSaved} prefill={prefill} />
+          : <FullForm patientId={patientId} onSaved={handleSaved} prefill={prefill} />
       )}
 
       {mode === 'history' && (

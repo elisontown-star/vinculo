@@ -22,7 +22,9 @@ type FormState = {
   notes: string;
 };
 
-export default function AgendaView() {
+export default function AgendaView({ onRegisterSession }: {
+  onRegisterSession?: (patientId: string, prefill: { occurredAt: string; durationMin?: number }) => void;
+}) {
   const { t } = useI18n();
   const me = getUser() as { role?: string; id?: string; name?: string } | null;
   const isPsych = me?.role === 'psychologist';
@@ -282,6 +284,25 @@ export default function AgendaView() {
 
             <label className="admin-modal-label">{t('agenda.notes')}</label>
             <textarea className="admin-modal-input" rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+
+            {form.id && onRegisterSession && form.status === 'scheduled' && (
+              <button
+                type="button"
+                className="btn-register-session"
+                disabled={busy}
+                onClick={() => {
+                  const appt = appts.find((a) => a.id === form.id);
+                  if (!appt) return;
+                  const d = new Date(appt.startsAt);
+                  const occurredAt = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+                  const durationMin = Math.round((appt.endsAt - appt.startsAt) / 60000);
+                  setForm(null);
+                  onRegisterSession(appt.patientId, { occurredAt, durationMin });
+                }}
+              >
+                📋 Registrar consulta
+              </button>
+            )}
 
             <div className="admin-modal-actions" style={{ justifyContent: form.id ? 'space-between' : 'flex-end' }}>
               {form.id && <button className="btn-danger-outline sm" onClick={removeAppt} disabled={busy}>{t('agenda.delete')}</button>}

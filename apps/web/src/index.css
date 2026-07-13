@@ -242,6 +242,14 @@ input, textarea, select, button { font-family: inherit; }
 .tags.ro .tag { cursor: default; }
 .tags.ro .tag button { display: none; }
 
+/* Agenda ↔ Consulta sync */
+.appt-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 10px; background: color-mix(in srgb, var(--brand) 6%, transparent); border: 1px dashed color-mix(in srgb, var(--brand) 35%, transparent); border-radius: 8px; margin-bottom: 4px; }
+.appt-picker-label { font-size: 11px; font-weight: 600; color: var(--brand); text-transform: uppercase; letter-spacing: .04em; }
+.appt-pill { padding: 3px 10px; border-radius: 20px; background: var(--brand); color: #fff; font-size: 12px; font-weight: 500; border: none; cursor: pointer; transition: opacity .15s; white-space: nowrap; }
+.appt-pill:hover { opacity: .85; }
+.btn-register-session { width: 100%; padding: 8px; margin-bottom: 8px; background: color-mix(in srgb, var(--brand) 8%, transparent); border: 1px solid color-mix(in srgb, var(--brand) 30%, transparent); border-radius: 8px; color: var(--brand); font-size: 13px; font-weight: 600; cursor: pointer; transition: background .15s; }
+.btn-register-session:hover { background: color-mix(in srgb, var(--brand) 14%, transparent); }
+
 /* Ficha */
 .ficha-tab { max-width: 880px; }
 .photo-row { display: flex; align-items: center; gap: 18px; margin-bottom: 26px; padding: 18px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }

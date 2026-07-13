@@ -162,6 +162,7 @@ export default function Workspace({ onLogout, onBackToAdmin }: { onLogout: () =>
   const [tab, setTab] = useState<Tab>(getUser()?.role === 'secretary' ? 'dados' : 'consulta');
   const [topView, setTopView] = useState<'patients' | 'agenda'>('patients');
   const [error, setError] = useState('');
+  const [consultaPrefill, setConsultaPrefill] = useState<{ occurredAt?: string; durationMin?: number } | undefined>(undefined);
 
   const fmtDate = (ms: number) => new Date(ms).toLocaleDateString(LOCALE[lang], { day: '2-digit', month: 'short', year: 'numeric' });
 
@@ -207,9 +208,9 @@ export default function Workspace({ onLogout, onBackToAdmin }: { onLogout: () =>
     loadPatients();
   }, []);
 
-  function select(id: string) {
+  function select(id: string, targetTab?: Tab) {
     setSelectedId(id);
-    setTab('dados');
+    setTab(targetTab ?? 'dados');
     setPatient(null);
     loadDetail(id);
     loadSessions(id);
@@ -321,7 +322,11 @@ export default function Workspace({ onLogout, onBackToAdmin }: { onLogout: () =>
       {error && <div className="container"><div className="error">{error}</div></div>}
 
       {topView === 'agenda' ? (
-        <AgendaView />
+        <AgendaView onRegisterSession={(patientId, prefill) => {
+          setConsultaPrefill(prefill);
+          setTopView('patients');
+          select(patientId, 'consulta');
+        }} />
       ) : (
       <div className="workspace two">
         <PatientRail patients={patients} selectedId={selectedId} onSelect={select} onAdd={addPatient} onOpenTrash={openTrash} showTrash={!isSecretary} />
@@ -387,7 +392,15 @@ export default function Workspace({ onLogout, onBackToAdmin }: { onLogout: () =>
                 <DadosCadastraisTab key={`d-${patient.id}`} patient={patient} onSaved={() => { loadDetail(patient.id); loadPatients(); }} />
               )}
               {tab === 'consulta' && (patient.clinicalAccess !== false || isSecretary) && (
-                <ConsultaTab key={`c-${patient.id}`} patientId={patient.id} sessions={sessions} loadingSessions={loadingSessions} onSaved={() => loadSessions(patient.id)} />
+                <ConsultaTab
+                  key={`c-${patient.id}-${consultaPrefill?.occurredAt ?? ''}`}
+                  patientId={patient.id}
+                  sessions={sessions}
+                  loadingSessions={loadingSessions}
+                  onSaved={() => { loadSessions(patient.id); setConsultaPrefill(undefined); }}
+                  defaultMode={consultaPrefill ? 'form' : undefined}
+                  prefill={consultaPrefill}
+                />
               )}
               {tab === 'ficha' && patient.clinicalAccess !== false && (
                 <FichaTab key={`f-${patient.id}`} patient={patient} onSaved={() => { loadDetail(patient.id); loadPatients(); }} />
