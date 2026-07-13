@@ -76,7 +76,8 @@ function ApptPicker({ patientId, onPick }: { patientId: string; onPick: (appt: U
       {appts.map((a) => {
         const start = new Date(a.startsAt);
         const durMin = Math.round((a.endsAt - a.startsAt) / 60000);
-        const label = start.toLocaleString(locale, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) + ` · ${durMin} min`;
+        const durStr = durMin > 0 ? ` · ${durMin} min` : '';
+        const label = start.toLocaleString(locale, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) + durStr;
         return (
           <button key={a.id} type="button" className="appt-pill" onClick={() => onPick(a)}>
             📅 {label}
@@ -107,7 +108,7 @@ function FullForm({ patientId, onSaved, prefill }: { patientId: string; onSaved:
     const d = new Date(appt.startsAt);
     const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
     const dur = Math.round((appt.endsAt - appt.startsAt) / 60000);
-    setForm((f) => ({ ...f, occurredAt: local, durationMin: dur }));
+    setForm((f) => ({ ...f, occurredAt: local, durationMin: dur > 0 ? dur : undefined }));
   }
 
   async function save(e: React.FormEvent) {
@@ -244,8 +245,9 @@ function SecretaryForm({ patientId, onSaved, prefill }: { patientId: string; onS
   function fillFromAppt(appt: UpcomingAppt) {
     const d = new Date(appt.startsAt);
     const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    const dur = Math.round((appt.endsAt - appt.startsAt) / 60000);
     setOccurredAt(local);
-    setDurationMin(Math.round((appt.endsAt - appt.startsAt) / 60000));
+    setDurationMin(dur > 0 ? dur : undefined);
   }
 
   return (
