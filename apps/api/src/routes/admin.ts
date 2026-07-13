@@ -419,4 +419,11 @@ adminRoutes.post('/clinics/:id/plan', zValidator('json', planSchema), async (c) 
 adminRoutes.get('/stats', async (c) => {
   const db = getDb(c.env);
   const clinicCount = await db.select({ n: sql<number>`count(*)` }).from(clinics).get();
-  const userCount = a
+  const userCount = await db.select({ n: sql<number>`count(*)` }).from(users).get();
+  const patientCount = await db.select({ n: sql<number>`count(*)` }).from(patients).where(isNull(patients.deletedAt)).get();
+  return c.json({
+    clinics: clinicCount?.n ?? 0,
+    users: userCount?.n ?? 0,
+    patients: patientCount?.n ?? 0,
+  });
+});

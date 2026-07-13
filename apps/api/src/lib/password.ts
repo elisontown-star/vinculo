@@ -31,4 +31,22 @@ export async function verifyPassword(password: string, stored: string): Promise<
   const [scheme, iterStr, saltB64, hashB64] = stored.split('$');
   if (scheme !== 'pbkdf2') return false;
   const candidate = await derive(password, fromBase64(saltB64), Number(iterStr));
-  // Constant-time comparison via 
+  // Constant-time comparison via double-HMAC with ephemeral key (prevents timing attacks).
+  const key = await crypto.subtle.importKey(
+    'raw',
+    crypto.getRandomValues(new Uint8Array(32)),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const [mac1, mac2] = await Promise.all([
+    crypto.subtle.sign('HMAC', key, ENC.encode(candidate)),
+    crypto.subtle.sign('HMAC', key, ENC.encode(hashB64)),
+  ]);
+  const a = new Uint8Array(mac1);
+  const b = new Uint8Array(mac2);
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
+  return diff === 0;
+}

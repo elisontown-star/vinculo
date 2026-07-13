@@ -21,4 +21,18 @@ export const requireAuth = createMiddleware<AppBindings>(async (c, next) => {
   if (tokenVersion !== null) {
     const row = await c.env.DB
       .prepare('SELECT token_version FROM users WHERE id = ? LIMIT 1')
-      .bind(String(payload.su
+      .bind(String(payload.sub))
+      .first<{ token_version: number }>();
+    if (!row || row.token_version !== tokenVersion) {
+      return c.json({ error: 'token_revoked' }, 401);
+    }
+  }
+
+  c.set('user', {
+    userId: String(payload.sub),
+    clinicId: String(payload.cid),
+    role: String(payload.role) as any,
+    name: String(payload.name ?? ''),
+  });
+  await next();
+});

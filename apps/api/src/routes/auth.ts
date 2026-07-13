@@ -402,4 +402,23 @@ authRoutes.post('/reset-password', zValidator('json', resetSchema), async (c) =>
   // Código válido: troca a senha.
   const db = getDb(c.env);
   const user = await db.select().from(users).where(eq(users.email, email)).get();
-  if (!use
+  if (!user) return c.json({ error: 'invalid_code' }, 401);
+
+  const passwordHash = await hashPassword(password);
+  await db
+    .update(users)
+    .set({ passwordHash, tokenVersion: (user.tokenVersion ?? 0) + 1 })
+    .where(eq(users.id, user.id));
+
+  await c.env.CACHE.delete(`pwreset:${email}`);
+
+  await audit(c.env, {
+    clinicId: user.clinicId,
+    actorUserId: user.id,
+    action: 'reset_password',
+    entity: 'user',
+    entityId: user.id,
+  });
+
+  return c.json({ ok: true });
+});
