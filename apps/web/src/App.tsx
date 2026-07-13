@@ -50,6 +50,7 @@ function maskTaxId(type: 'cnpj' | 'cpf', v: string): string {
   return s;
 }
 
+
 function TermsModal({ onClose }: { onClose: () => void }) {
   const overlayRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -109,13 +110,13 @@ function TermsModal({ onClose }: { onClose: () => void }) {
           <p>A VTech não se responsabiliza por danos decorrentes de decisões clínicas tomadas com base nas sugestões da IA, interrupções temporárias do serviço por falhas de terceiros, ou perda de dados por ação do próprio usuário. Em qualquer hipótese, a responsabilidade máxima da VTech fica limitada ao valor pago nos últimos 3 meses de assinatura.</p>
 
           <h2>10. Alterações nos Termos</h2>
-          <p>A VTech poderá alterar estes Termos a qualquer momento. Alterações relevantes serão comunicadas com pelo menos 15 dias de antecedência por e-mail ou notificação na plataforma. O uso contínuo após a vigência das alterações constituirá aceitação.</p>
+          <p>A VTech poderá alterar estes Termos a qualquer momento. Alterações relevantes serão comunicadas com pelo menos 15 dias de antecedência por e-mail ou notificação na plataforma.</p>
 
           <h2>11. Rescisão</h2>
           <p>O usuário pode encerrar sua conta a qualquer momento. A VTech poderá suspender ou encerrar o acesso em caso de violação destes Termos, inadimplência persistente, risco à segurança da plataforma ou determinação legal.</p>
 
           <h2>12. Disposições Gerais</h2>
-          <p>Estes Termos são regidos pela legislação brasileira. Fica eleito o foro da Comarca de <strong>São Paulo/SP</strong> para dirimir quaisquer controvérsias, salvo nos casos em que a legislação consumeirista determine o foro do domicílio do consumidor. Dúvidas: <strong>juridico@vtechit.com.br</strong></p>
+          <p>Estes Termos são regidos pela legislação brasileira. Fica eleito o foro da Comarca de <strong>São Paulo/SP</strong>. Dúvidas: <strong>juridico@vtechit.com.br</strong></p>
         </div>
       </div>
     </div>
@@ -306,4 +307,188 @@ function Auth({ onDone }: { onDone: () => void }) {
       </div>
 
       <div className="auth-hero">
-        <Brand h
+        <Brand hideLogo />
+        <h2 className="hero-title">{t('hero.title')}</h2>
+        <p className="hero-sub">{t('hero.sub')}</p>
+        <ul className="hero-points">
+          <li>{t('hero.p1')}</li>
+          <li>{t('hero.p2')}</li>
+          <li>{t('hero.p3')}</li>
+        </ul>
+        <a
+          className="hero-foot-badge"
+          href="https://vtechit.com.br"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <img src={VTECH_LOGO} alt="VTECH IT" className="hero-foot-logo" />
+          <span className="hero-foot-text">{t('hero.foot')}</span>
+        </a>
+      </div>
+
+      <div className="auth-panel">
+        <div className="auth-card">
+          <h1>{mode === 'register' ? t('auth.registerTitle') : t('auth.loginTitle')}</h1>
+          <p className="sub">{mode === 'register' ? t('auth.registerSub') : t('auth.loginSub')}</p>
+
+          {error && <div className="error">{error}</div>}
+
+          <form onSubmit={submit}>
+            {mode === 'register' && (
+              <>
+                <div className="field">
+                  <label htmlFor="clinic">{t('lbl.clinicName')}</label>
+                  <input id="clinic" value={clinicName} onChange={(e) => setClinicName(e.target.value)} required />
+                </div>
+                <div className="field">
+                  <label htmlFor="taxid">{t('lbl.taxId')}</label>
+                  <div className="seg">
+                    <button type="button" className={taxIdType === 'cnpj' ? 'on' : ''} onClick={() => { setTaxIdType('cnpj'); setTaxId(''); }}>{t('taxId.cnpj')}</button>
+                    <button type="button" className={taxIdType === 'cpf' ? 'on' : ''} onClick={() => { setTaxIdType('cpf'); setTaxId(''); }}>{t('taxId.cpf')}</button>
+                  </div>
+                  <input
+                    id="taxid"
+                    inputMode="numeric"
+                    value={taxId}
+                    onChange={(e) => setTaxId(maskTaxId(taxIdType, e.target.value))}
+                    placeholder={taxIdType === 'cnpj' ? '00.000.000/0000-00' : '000.000.000-00'}
+                    required
+                  />
+                </div>
+                <div className="field">
+                  <label>{t('lbl.plan')}</label>
+                  <div className="plan-picker">
+                    {(['essencial', 'pro', 'plus'] as const).map((p) => (
+                      <button type="button" key={p} className={`plan-card ${plan === p ? 'on' : ''}`} onClick={() => setPlan(p)}>
+                        <span className="plan-name">{t('plan.' + p)}</span>
+                        <span className="plan-seats">{t('plan.' + p + '.seats')}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="field">
+                  <label htmlFor="name">{t('lbl.yourName')}</label>
+                  <input id="name" value={name} onChange={(e) => setName(e.target.value)} required />
+                </div>
+              </>
+            )}
+            <div className="field">
+              <label htmlFor="email">{t('lbl.email')}</label>
+              <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            </div>
+            <div className="field">
+              <label htmlFor="password">{t('lbl.password')}</label>
+              <input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={8} required />
+            </div>
+            {mode === 'register' && password.length > 0 && (
+              <ul className="pw-rules">
+                <li className={password.length >= 8 ? 'ok' : ''}>{t('pw.length')}</li>
+                <li className={/[a-z]/.test(password) ? 'ok' : ''}>{t('pw.lower')}</li>
+                <li className={/[A-Z]/.test(password) ? 'ok' : ''}>{t('pw.upper')}</li>
+                <li className={/[0-9]/.test(password) ? 'ok' : ''}>{t('pw.number')}</li>
+                <li className={/[^A-Za-z0-9]/.test(password) ? 'ok' : ''}>{t('pw.special')}</li>
+              </ul>
+            )}
+            {mode === 'register' && (
+              <div className="trial-notice">🎁 {t('auth.trialNotice')}</div>
+            )}
+            {mode === 'register' && (
+              <label className="terms-check-label">
+                <input
+                  type="checkbox"
+                  checked={termsAccepted}
+                  onChange={(e) => setTermsAccepted(e.target.checked)}
+                  className="terms-check-input"
+                />
+                <span>
+                  Li e aceito os{' '}
+                  <button type="button" className="terms-inline-link" onClick={() => setShowTerms(true)}>
+                    Termos de Uso
+                  </button>
+                  {' '}e a{' '}
+                  <button type="button" className="terms-inline-link" onClick={() => setShowTerms(true)}>
+                    Política de Privacidade
+                  </button>
+                </span>
+              </label>
+            )}
+            <button className="btn" disabled={busy || (mode === 'register' && !termsAccepted)}>
+              {busy ? t('btn.wait') : mode === 'register' ? t('btn.createClinic') : t('btn.enter')}
+            </button>
+          </form>
+
+          {mode === 'login' && (
+            <button className="link-forgot" type="button" onClick={() => setShowForgot(true)}>
+              {t('fp.link')}
+            </button>
+          )}
+
+          <div className="terms-footer-link">
+            <button type="button" className="terms-inline-link" onClick={() => setShowTerms(true)}>Termos de Uso</button>
+            {' · '}
+            <button type="button" className="terms-inline-link" onClick={() => setShowTerms(true)}>Privacidade</button>
+          </div>
+
+          {mode === 'login' ? (
+            <div className="cta-free-wrap">
+              <div className="cta-divider"><span>{t('cta.new')}</span></div>
+              <button type="button" className="cta-free" onClick={() => setMode('register')}>
+                {t('cta.freeSignup')} →
+              </button>
+              <div className="cta-free-note">{t('cta.badge')} · {t('cta.freeSub')}</div>
+            </div>
+          ) : (
+            <div className="switch">
+              {t('sw.hasAccount')} <button onClick={() => setMode('login')}>{t('sw.enter')}</button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+    {showTerms && <TermsModal onClose={() => setShowTerms(false)} />}
+  );
+}
+
+export default function App() {
+  const [authed, setAuthed] = useState<boolean>(!!localStorage.getItem('vinculo_token'));
+  const [adminView, setAdminView] = useState<'admin' | 'clinic'>('admin');
+  const [mfaPrompt, setMfaPrompt] = useState(false);
+
+  // Mostra o pop-up de MFA APENAS no primeiro acesso (logo após o login).
+  // Nunca em refresh/reabertura com a sessão já aberta.
+  function afterLogin() {
+    setAuthed(true);
+    const u = getUser() as { mfaEnabled?: boolean } | null;
+    const snooze = Number(localStorage.getItem('vinculo_mfa_snooze') || 0);
+    if (u && !u.mfaEnabled && Date.now() > snooze) setMfaPrompt(true);
+  }
+
+  function logout() {
+    clearToken();
+    localStorage.removeItem('vinculo_user');
+    setAuthed(false);
+    setAdminView('admin');
+  }
+
+  if (!authed) return <Auth onDone={afterLogin} />;
+
+  const user = getUser();
+  let content;
+  if (user?.role === 'platform_admin') {
+    content =
+      adminView === 'clinic' ? (
+        <Workspace onLogout={logout} onBackToAdmin={() => setAdminView('admin')} />
+      ) : (
+        <AdminPanel onLogout={logout} onViewClinic={() => setAdminView('clinic')} />
+      );
+  } else {
+    content = <Workspace onLogout={logout} />;
+  }
+
+  return (
+    <>
+      {content}
+      {mfaPrompt && <MfaEnablePrompt onClose={() => setMfaPrompt(false)} />}
+    </>
+  );
+}

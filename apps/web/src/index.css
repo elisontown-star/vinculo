@@ -545,8 +545,6 @@ input, textarea, select, button { font-family: inherit; }
 .fp-box h1 { font-family: 'Montserrat', system-ui, sans-serif; font-size: 22px; margin: 0 0 6px; color: var(--navy); }
 .fp-box .sub { color: var(--muted); font-size: 14px; margin: 0 0 18px; line-height: 1.5; }
 .fp-box .field { text-align: left; }
-.link-forgot { display: block; margin: 12px auto 0; background: none; border: none; color: var(--navy); font-size: 13px; cursor: pointer; text-decoration: underline; }
-.link-forgot:hover { color: var(--orange-deep); }
 
 /* ── Termos de Uso ── */
 .terms-check-label { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; color: var(--muted); margin: 10px 0 14px; cursor: pointer; line-height: 1.5; }
@@ -570,6 +568,9 @@ input, textarea, select, button { font-family: inherit; }
 .terms-callout { background: #eef1f9; border-left: 3px solid #1a2960; border-radius: 0 8px 8px 0; padding: 10px 14px; font-size: 13px; color: #1a2960; margin-bottom: 16px; line-height: 1.55; }
 .terms-callout-warn { background: #fff7ed; border-left-color: #d97706; color: #92400e; }
 @keyframes slide-up { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+
+.link-forgot { display: block; margin: 12px auto 0; background: none; border: none; color: var(--navy); font-size: 13px; cursor: pointer; text-decoration: underline; }
+.link-forgot:hover { color: var(--orange-deep); }
 
 /* ======================================================================
    Tela de login — polimento profissional + animações
@@ -1107,4 +1108,29 @@ body { line-height: 1.55; letter-spacing: -0.005em; }
 .cta-free-note { margin-top: 10px; font-size: 12px; color: var(--muted); }
 
 /* --- Código de empresa no super admin -------------------------------------- */
-.admin-company-code { display: inline-flex; align-items: center; gap: 8px
+.admin-company-code { display: inline-flex; align-items: center; gap: 8px; margin: 8px 0 4px; font-size: 12px; color: var(--muted); }
+.admin-company-code span { text-transform: uppercase; letter-spacing: 0.4px; }
+.admin-company-code code { font-family: ui-monospace, Menlo, monospace; font-weight: 700; color: var(--navy); background: var(--navy-tint); padding: 3px 9px; border-radius: 6px; letter-spacing: 0.5px; }
+.admin-clinic-code { font-family: ui-monospace, Menlo, monospace; font-size: 11px; color: var(--orange-deep, #d96d0a); font-weight: 700; margin: 1px 0; letter-spacing: 0.5px; }
+
+/* --- Biblioteca de arquivos do paciente ------------------------------------ */
+.biblioteca { padding: 4px 0; }
+.biblioteca-upload { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 14px; margin-bottom: 16px; }
+.biblioteca-upload-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.bib-label { font-size: 12px; font-weight: 600; color: var(--muted); }
+.biblioteca-upload-row select { padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font-size: 13px; }
+.biblioteca-hint { margin: 10px 0 0; font-size: 12px; color: var(--muted); }
+.biblioteca-empty { text-align: center; color: var(--muted); padding: 34px; border: 1px dashed var(--line); border-radius: var(--radius-sm); font-size: 14px; }
+.biblioteca-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.biblioteca-item { display: flex; align-items: center; gap: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 10px 12px; }
+.bib-cat { flex-shrink: 0; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.3px; background: var(--navy-tint); color: var(--navy); }
+.bib-cat.cat-receituario { background: #e8f0ff; color: #1a4fa0; }
+.bib-cat.cat-guia { background: #fff1e0; color: #b36b00; }
+.bib-cat.cat-laudo { background: #eafaf0; color: #1a7a43; }
+.bib-cat.cat-outros { background: var(--bg); color: var(--muted); }
+.bib-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.bib-name { font-size: 13.5px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bib-meta { font-size: 12px; color: var(--muted); }
+.bib-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.bib-del { background: none; border: none; color: var(--muted); cursor: pointer; padding: 6px; border-radius: 6px; display: inline-flex; }
+.bib-del:hover { background: #fdecec; color: #c0392b; }
