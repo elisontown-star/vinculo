@@ -952,9 +952,8 @@ patientRoutes.post('/ana-chat', blockSecretary, zValidator('json', chatSchema), 
         .from(patients)
         .where(and(eq(patients.clinicId, user.clinicId), isNull(patients.deletedAt), vis))
         .all();
-      // Casa se qualquer parte do nome (>=3 letras) aparece na mensagem.
       const match = all.find((pt) => {
-        if (pt.id === patientId) return false; // já é o paciente aberto
+        if (pt.id === patientId) return false;
         const full = norm(pt.fullName);
         if (q.includes(full)) return true;
         return full.split(/\s+/).some((part) => part.length >= 3 && q.includes(part));
@@ -969,4 +968,19 @@ patientRoutes.post('/ana-chat', blockSecretary, zValidator('json', chatSchema), 
 
   const system =
     ANA_PERSONA +
-    '\n\nCONTEXTO DE USO: você está num CHAT com o psicól
+    '\n\nCONTEXTO DE USO: você está num CHAT com o psicólogo. Responda de forma conversacional, direta e útil, em português. Use os dados do paciente quando a pergunta for sobre ele.' +
+    patientContext;
+
+  let result: string;
+  try {
+    const resp = (await c.env.AI.run('@cf/meta/llama-3.3-70b-instruct-fp8-fast' as any, {
+      messages: [{ role: 'system', content: system }, ...messages],
+      max_tokens: 1024,
+    })) as { response?: string };
+    result = resp.response ?? 'Não consegui responder agora.';
+  } catch {
+    return c.json({ error: 'ai_error' }, 500);
+  }
+
+  return c.json({ reply: result });
+});

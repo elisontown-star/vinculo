@@ -55,4 +55,6 @@ export async function consumeRecoveryCode(
   storedHashes: string[],
 ): Promise<string[] | null> {
   const h = await sha256(input.replace(/\s+/g, '').toLowerCase());
-  if (!storedHashes.includes(h)) retu
+  if (!storedHashes.includes(h)) return null;
+  return storedHashes.filter((x) => x !== h);
+}
