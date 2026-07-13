@@ -351,12 +351,12 @@ patientRoutes.post('/:id/sessions', zValidator('json', sessionSchema), async (c)
     entityId: row.id,
   });
 
-  // Auto-completar o agendamento mais próximo do horário da consulta (±90 min).
-  if (body.occurredAt) {
-    const targetMs = new Date(body.occurredAt).getTime();
-    const windowMs = 90 * 60 * 1000;
-    const nearbyAppt = await getDb(c.env)
-      .select({ id: appointments.id })
+  // Auto-completar o agendamento mais próximo do horário da consulta (mesmo dia ±12h).
+  {
+    const targetMs = body.occurredAt ? new Date(body.occurredAt).getTime() : row.occurredAt instanceof Date ? row.occurredAt.getTime() : Number(row.occurredAt);
+    const windowMs = 12 * 60 * 60 * 1000; // 12 horas — cobre o mesmo dia de trabalho
+    const candidates = await getDb(c.env)
+      .select({ id: appointments.id, startsAt: appointments.startsAt })
       .from(appointments)
       .where(and(
         eq(appointments.patientId, id),
@@ -365,12 +365,18 @@ patientRoutes.post('/:id/sessions', zValidator('json', sessionSchema), async (c)
         gte(appointments.startsAt, new Date(targetMs - windowMs)),
         lte(appointments.startsAt, new Date(targetMs + windowMs)),
       ))
-      .get();
-    if (nearbyAppt) {
+      .all();
+    if (candidates.length > 0) {
+      // Pega o mais próximo do horário da consulta
+      const closest = candidates.reduce((a, b) => {
+        const aMs = a.startsAt instanceof Date ? a.startsAt.getTime() : Number(a.startsAt);
+        const bMs = b.startsAt instanceof Date ? b.startsAt.getTime() : Number(b.startsAt);
+        return Math.abs(aMs - targetMs) <= Math.abs(bMs - targetMs) ? a : b;
+      });
       await getDb(c.env)
         .update(appointments)
         .set({ status: 'done' })
-        .where(eq(appointments.id, nearbyAppt.id));
+        .where(eq(appointments.id, closest.id));
     }
   }
 
