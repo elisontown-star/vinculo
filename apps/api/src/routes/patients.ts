@@ -273,17 +273,27 @@ patientRoutes.patch('/:id', zValidator('json', updateSchema), async (c) => {
 });
 
 // ---- Consultas -----------------------------------------------------------
-patientRoutes.get('/:id/sessions', requireClinicalAccess, async (c) => {
+patientRoutes.get('/:id/sessions', async (c) => {
   const user = c.get('user');
   const id = c.req.param('id');
   if (!(await findPatient(c, user, id))) return c.json({ error: 'not_found' }, 404);
+  // Secretary: visibilidade permitida, mas sem dados clínicos.
+  const secretary = isSecretary(user);
+  if (!secretary) {
+    const grantors = await activeGrantors(c, user);
+    const patient = await findPatient(c, user, id);
+    if (!patient || !hasClinicalAccess(user, patient, grantors)) return c.json({ error: 'forbidden_clinical' }, 403);
+  }
   const rows = await getDb(c.env)
     .select()
     .from(sessions)
     .where(eq(sessions.patientId, id))
     .orderBy(desc(sessions.occurredAt))
     .all();
-  return c.json({ sessions: rows.map(serializeSession) });
+  const serialize = secretary
+    ? (s: SessionRow) => ({ id: s.id, patientId: s.patientId, occurredAt: s.occurredAt, durationMin: s.durationMin, freeNotes: s.freeNotes, createdAt: s.createdAt })
+    : serializeSession;
+  return c.json({ sessions: rows.map(serialize) });
 });
 
 const sessionSchema = z.object({
@@ -299,10 +309,17 @@ const sessionSchema = z.object({
   freeNotes: z.string().optional(),
 });
 
-patientRoutes.post('/:id/sessions', requireClinicalAccess, zValidator('json', sessionSchema), async (c) => {
+patientRoutes.post('/:id/sessions', zValidator('json', sessionSchema), async (c) => {
   const user = c.get('user');
   const id = c.req.param('id');
   if (!(await findPatient(c, user, id))) return c.json({ error: 'not_found' }, 404);
+  // Secretary: pode registrar sessão, mas apenas campos não-clínicos.
+  const secretary = isSecretary(user);
+  if (!secretary) {
+    const grantors = await activeGrantors(c, user);
+    const patient = await findPatient(c, user, id);
+    if (!patient || !hasClinicalAccess(user, patient, grantors)) return c.json({ error: 'forbidden_clinical' }, 403);
+  }
   const body = c.req.valid('json');
   const psychologistId =
     user.role === 'psychologist' || user.role === 'owner' ? user.userId : null;
@@ -314,13 +331,14 @@ patientRoutes.post('/:id/sessions', requireClinicalAccess, zValidator('json', se
       psychologistId,
       occurredAt: body.occurredAt ? new Date(body.occurredAt) : new Date(),
       durationMin: body.durationMin ?? null,
-      mood: body.mood ?? null,
-      emotionalScale: body.emotionalScale ?? null,
-      topics: body.topics && body.topics.length ? JSON.stringify(body.topics) : null,
-      objectives: body.objectives ?? null,
-      techniques: body.techniques ?? null,
-      evolution: body.evolution ?? null,
-      nextSteps: body.nextSteps ?? null,
+      // Campos clínicos: bloqueados para secretária
+      mood: secretary ? null : (body.mood ?? null),
+      emotionalScale: secretary ? null : (body.emotionalScale ?? null),
+      topics: secretary ? null : (body.topics && body.topics.length ? JSON.stringify(body.topics) : null),
+      objectives: secretary ? null : (body.objectives ?? null),
+      techniques: secretary ? null : (body.techniques ?? null),
+      evolution: secretary ? null : (body.evolution ?? null),
+      nextSteps: secretary ? null : (body.nextSteps ?? null),
       freeNotes: body.freeNotes ?? null,
     })
     .returning()

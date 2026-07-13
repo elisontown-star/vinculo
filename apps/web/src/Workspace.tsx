@@ -177,7 +177,7 @@ export default function Workspace({ onLogout, onBackToAdmin }: { onLogout: () =>
     try {
       const p = (await api.getPatient(id)).patient;
       setPatient(p);
-      if (p.clinicalAccess === false) setTab('dados');
+      if (p.clinicalAccess === false && !isSecretary) setTab('dados');
     } catch {
       setPatient(null);
     }
@@ -361,9 +361,11 @@ export default function Workspace({ onLogout, onBackToAdmin }: { onLogout: () =>
 
             <nav className="tabs">
               <button className={tab === 'dados' ? 'on' : ''} onClick={() => setTab('dados')}>{t('tab.dados')}</button>
+              {(patient.clinicalAccess !== false || isSecretary) && (
+                <button className={tab === 'consulta' ? 'on' : ''} onClick={() => setTab('consulta')}>{t('tab.consulta')}</button>
+              )}
               {patient.clinicalAccess !== false && (
                 <>
-                  <button className={tab === 'consulta' ? 'on' : ''} onClick={() => setTab('consulta')}>{t('tab.consulta')}</button>
                   <button className={tab === 'ficha' ? 'on' : ''} onClick={() => setTab('ficha')}>{t('tab.ficha')}</button>
                   <button className={tab === 'timeline' ? 'on' : ''} onClick={() => setTab('timeline')}>{t('tab.timeline')}</button>
                   <button className={`tab-ana ${tab === 'ana' ? 'on' : ''}`} onClick={() => setTab('ana')}>
@@ -384,7 +386,7 @@ export default function Workspace({ onLogout, onBackToAdmin }: { onLogout: () =>
               {tab === 'dados' && (
                 <DadosCadastraisTab key={`d-${patient.id}`} patient={patient} onSaved={() => { loadDetail(patient.id); loadPatients(); }} />
               )}
-              {tab === 'consulta' && patient.clinicalAccess !== false && (
+              {tab === 'consulta' && (patient.clinicalAccess !== false || isSecretary) && (
                 <ConsultaTab key={`c-${patient.id}`} patientId={patient.id} sessions={sessions} loadingSessions={loadingSessions} onSaved={() => loadSessions(patient.id)} />
               )}
               {tab === 'ficha' && patient.clinicalAccess !== false && (
