@@ -548,6 +548,26 @@ input, textarea, select, button { font-family: inherit; }
 .link-forgot { display: block; margin: 12px auto 0; background: none; border: none; color: var(--navy); font-size: 13px; cursor: pointer; text-decoration: underline; }
 .link-forgot:hover { color: var(--orange-deep); }
 
+/* ── Termos de Uso ── */
+.terms-check-label { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; color: var(--muted); margin: 10px 0 14px; cursor: pointer; line-height: 1.5; }
+.terms-check-input { width: 16px; height: 16px; flex-shrink: 0; margin-top: 2px; accent-color: var(--navy); cursor: pointer; }
+.terms-inline-link { background: none; border: none; padding: 0; color: var(--navy); font-size: inherit; font-family: inherit; font-weight: 600; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.terms-inline-link:hover { color: var(--orange-deep); }
+.terms-footer-link { text-align: center; margin-top: 16px; font-size: 12px; color: var(--muted); }
+
+/* ── Modal de Termos ── */
+.terms-overlay { position: fixed; inset: 0; z-index: 1000; background: rgba(17,30,74,0.55); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; padding: 20px; animation: fade-in 0.2s ease; }
+.terms-modal { background: #fff; border-radius: 14px; width: 100%; max-width: 780px; height: 82vh; display: flex; flex-direction: column; box-shadow: 0 32px 80px rgba(17,30,74,0.25); overflow: hidden; animation: slide-up 0.25s ease; }
+.terms-modal-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-bottom: 1px solid #eaecf2; flex-shrink: 0; }
+.terms-modal-title { font-family: 'Montserrat', system-ui, sans-serif; font-weight: 700; font-size: 14px; color: #1a2960; }
+.terms-modal-actions { display: flex; align-items: center; gap: 12px; }
+.terms-open-link { font-size: 12px; color: #0d9488; text-decoration: none; font-weight: 600; }
+.terms-open-link:hover { text-decoration: underline; }
+.terms-close-btn { background: none; border: none; font-size: 18px; line-height: 1; cursor: pointer; color: #71778f; padding: 2px 6px; border-radius: 6px; }
+.terms-close-btn:hover { background: #eef1f9; color: #1a2960; }
+.terms-iframe { flex: 1; border: none; width: 100%; }
+@keyframes slide-up { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+
 /* ======================================================================
    Tela de login — polimento profissional + animações
    ====================================================================== */
@@ -1089,24 +1109,4 @@ body { line-height: 1.55; letter-spacing: -0.005em; }
 .admin-company-code code { font-family: ui-monospace, Menlo, monospace; font-weight: 700; color: var(--navy); background: var(--navy-tint); padding: 3px 9px; border-radius: 6px; letter-spacing: 0.5px; }
 .admin-clinic-code { font-family: ui-monospace, Menlo, monospace; font-size: 11px; color: var(--orange-deep, #d96d0a); font-weight: 700; margin: 1px 0; letter-spacing: 0.5px; }
 
-/* --- Biblioteca de arquivos do paciente ------------------------------------ */
-.biblioteca { padding: 4px 0; }
-.biblioteca-upload { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 14px; margin-bottom: 16px; }
-.biblioteca-upload-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.bib-label { font-size: 12px; font-weight: 600; color: var(--muted); }
-.biblioteca-upload-row select { padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font-size: 13px; }
-.biblioteca-hint { margin: 10px 0 0; font-size: 12px; color: var(--muted); }
-.biblioteca-empty { text-align: center; color: var(--muted); padding: 34px; border: 1px dashed var(--line); border-radius: var(--radius-sm); font-size: 14px; }
-.biblioteca-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.biblioteca-item { display: flex; align-items: center; gap: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 10px 12px; }
-.bib-cat { flex-shrink: 0; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.3px; background: var(--navy-tint); color: var(--navy); }
-.bib-cat.cat-receituario { background: #e8f0ff; color: #1a4fa0; }
-.bib-cat.cat-guia { background: #fff1e0; color: #b36b00; }
-.bib-cat.cat-laudo { background: #eafaf0; color: #1a7a43; }
-.bib-cat.cat-outros { background: var(--bg); color: var(--muted); }
-.bib-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.bib-name { font-size: 13.5px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.bib-meta { font-size: 12px; color: var(--muted); }
-.bib-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-.bib-del { background: none; border: none; color: var(--muted); cursor: pointer; padding: 6px; border-radius: 6px; display: inline-flex; }
-.bib-del:hover { background: #fdecec; color: #c0392b; }
+/* --- Biblioteca 

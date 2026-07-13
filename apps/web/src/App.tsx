@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { api, setToken, clearToken, setUser, getUser } from './lib/api';
 import { useI18n } from './i18n';
 import { Controls } from './Controls';
@@ -50,6 +50,41 @@ function maskTaxId(type: 'cnpj' | 'cpf', v: string): string {
   return s;
 }
 
+const TERMS_URL = 'https://vinculoclinico.com.br/termos';
+
+function TermsModal({ onClose }: { onClose: () => void }) {
+  const overlayRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+  return (
+    <div
+      className="terms-overlay"
+      ref={overlayRef}
+      onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}
+    >
+      <div className="terms-modal">
+        <div className="terms-modal-header">
+          <span className="terms-modal-title">Termos de Uso — Vínculo Clínico</span>
+          <div className="terms-modal-actions">
+            <a href={TERMS_URL} target="_blank" rel="noopener noreferrer" className="terms-open-link">
+              Abrir em nova aba ↗
+            </a>
+            <button className="terms-close-btn" onClick={onClose} aria-label="Fechar">✕</button>
+          </div>
+        </div>
+        <iframe
+          src={TERMS_URL}
+          className="terms-iframe"
+          title="Termos de Uso"
+        />
+      </div>
+    </div>
+  );
+}
+
 function Auth({ onDone }: { onDone: () => void }) {
   const { t, te } = useI18n();
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -64,6 +99,8 @@ function Auth({ onDone }: { onDone: () => void }) {
   const [blocked, setBlocked] = useState(false);
   const [busy, setBusy] = useState(false);
   const [mfaStep, setMfaStep] = useState<null | { kind: 'setup' | 'challenge'; token: string }>(null);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
   const resetParams = (() => {
     const p = new URLSearchParams(window.location.search);
     if (p.get('reset') === '1') {
@@ -76,6 +113,10 @@ function Auth({ onDone }: { onDone: () => void }) {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
+    if (mode === 'register' && !termsAccepted) {
+      setError('Você precisa aceitar os Termos de Uso para continuar.');
+      return;
+    }
     if (mode === 'register') {
       const strong =
         password.length >= 8 &&
@@ -313,76 +354,29 @@ function Auth({ onDone }: { onDone: () => void }) {
             {mode === 'register' && (
               <div className="trial-notice">🎁 {t('auth.trialNotice')}</div>
             )}
-            <button className="btn" disabled={busy}>
-              {busy ? t('btn.wait') : mode === 'register' ? t('btn.createClinic') : t('btn.enter')}
-            </button>
-          </form>
-
-          {mode === 'login' && (
-            <button className="link-forgot" type="button" onClick={() => setShowForgot(true)}>
-              {t('fp.link')}
-            </button>
-          )}
-
-          {mode === 'login' ? (
-            <div className="cta-free-wrap">
-              <div className="cta-divider"><span>{t('cta.new')}</span></div>
-              <button type="button" className="cta-free" onClick={() => setMode('register')}>
-                {t('cta.freeSignup')} →
-              </button>
-              <div className="cta-free-note">{t('cta.badge')} · {t('cta.freeSub')}</div>
-            </div>
-          ) : (
-            <div className="switch">
-              {t('sw.hasAccount')} <button onClick={() => setMode('login')}>{t('sw.enter')}</button>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-export default function App() {
-  const [authed, setAuthed] = useState<boolean>(!!localStorage.getItem('vinculo_token'));
-  const [adminView, setAdminView] = useState<'admin' | 'clinic'>('admin');
-  const [mfaPrompt, setMfaPrompt] = useState(false);
-
-  // Mostra o pop-up de MFA APENAS no primeiro acesso (logo após o login).
-  // Nunca em refresh/reabertura com a sessão já aberta.
-  function afterLogin() {
-    setAuthed(true);
-    const u = getUser() as { mfaEnabled?: boolean } | null;
-    const snooze = Number(localStorage.getItem('vinculo_mfa_snooze') || 0);
-    if (u && !u.mfaEnabled && Date.now() > snooze) setMfaPrompt(true);
-  }
-
-  function logout() {
-    clearToken();
-    localStorage.removeItem('vinculo_user');
-    setAuthed(false);
-    setAdminView('admin');
-  }
-
-  if (!authed) return <Auth onDone={afterLogin} />;
-
-  const user = getUser();
-  let content;
-  if (user?.role === 'platform_admin') {
-    content =
-      adminView === 'clinic' ? (
-        <Workspace onLogout={logout} onBackToAdmin={() => setAdminView('admin')} />
-      ) : (
-        <AdminPanel onLogout={logout} onViewClinic={() => setAdminView('clinic')} />
-      );
-  } else {
-    content = <Workspace onLogout={logout} />;
-  }
-
-  return (
-    <>
-      {content}
-      {mfaPrompt && <MfaEnablePrompt onClose={() => setMfaPrompt(false)} />}
-    </>
-  );
-}
+            {mode === 'register' && (
+              <label className="terms-check-label">
+                <input
+                  type="checkbox"
+                  checked={termsAccepted}
+                  onChange={(e) => setTermsAccepted(e.target.checked)}
+                  className="terms-check-input"
+                />
+                <span>
+                  Li e aceito os{' '}
+                  <button
+                    type="button"
+                    className="terms-inline-link"
+                    onClick={() => setShowTerms(true)}
+                  >
+                    Termos de Uso
+                  </button>
+                  {' '}e a{' '}
+                  <button
+                    type="button"
+                    className="terms-inline-link"
+                    onClick={() => setShowTerms(true)}
+                  >
+                    Política de Privacidade
+                  </button>
+                </span
