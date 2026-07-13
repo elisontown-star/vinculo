@@ -94,14 +94,33 @@ async function findPatient(c: any, user: AuthUser, id: string) {
     .get();
 }
 
+// Tamanho máximo para photo (data URL Base64) e profile (JSON serializado).
+const MAX_PHOTO_BYTES = 2 * 1024 * 1024; // 2 MB em Base64 (~1.5 MB real)
+const MAX_PROFILE_JSON_BYTES = 64 * 1024; // 64 KB
+
 // Monta os campos do paciente a partir do corpo (tudo opcional exceto nome).
 function patientValues(body: Record<string, any>) {
   const v: Record<string, any> = {};
-  for (const k of ['fullName', 'socialName', 'cpf', 'email', 'phone', 'whatsapp', 'status', 'photo']) {
+  for (const k of ['fullName', 'socialName', 'cpf', 'email', 'phone', 'whatsapp', 'status']) {
     if (body[k] !== undefined) v[k] = body[k];
   }
+  // Limita o tamanho da foto (data URL).
+  if (body.photo !== undefined) {
+    if (body.photo && body.photo.length > MAX_PHOTO_BYTES) {
+      throw new Error('photo_too_large');
+    }
+    v.photo = body.photo;
+  }
   if (body.birthDate !== undefined) v.birthDate = body.birthDate ? new Date(body.birthDate) : null;
-  if (body.profile !== undefined) v.profile = body.profile ? JSON.stringify(body.profile) : null;
+  if (body.profile !== undefined) {
+    if (body.profile) {
+      const serialized = JSON.stringify(body.profile);
+      if (serialized.length > MAX_PROFILE_JSON_BYTES) throw new Error('profile_too_large');
+      v.profile = serialized;
+    } else {
+      v.profile = null;
+    }
+  }
   return v;
 }
 
@@ -172,11 +191,17 @@ patientRoutes.post('/', zValidator('json', createSchema), async (c) => {
   const user = c.get('user');
   const body = c.req.valid('json');
   const db = getDb(c.env);
+  let values: Record<string, any>;
+  try {
+    values = patientValues(body);
+  } catch (e: any) {
+    return c.json({ error: e.message ?? 'invalid_input' }, 400);
+  }
   const psychologistId =
     user.role === 'psychologist' || user.role === 'owner' ? user.userId : null;
   const row = await db
     .insert(patients)
-    .values({ clinicId: user.clinicId, psychologistId, fullName: body.fullName, ...patientValues(body) })
+    .values({ clinicId: user.clinicId, psychologistId, fullName: body.fullName, ...values })
     .returning()
     .get();
   await audit(c.env, {
@@ -224,7 +249,12 @@ patientRoutes.patch('/:id', zValidator('json', updateSchema), async (c) => {
     }
     input.profile = incoming;
   }
-  const values = patientValues(input);
+  let values: Record<string, any>;
+  try {
+    values = patientValues(input);
+  } catch (e: any) {
+    return c.json({ error: e.message ?? 'invalid_input' }, 400);
+  }
   const db = getDb(c.env);
   const row = await db
     .update(patients)
@@ -614,12 +644,12 @@ patientRoutes.get('/:id/ai-questions', requireClinicalAccess, async (c) => {
   } catch (err) {
     const msg = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
     console.error('[ana] ERRO na chamada da IA:', msg);
-    return c.json({ error: 'ai_failed', detail: msg }, 502);
+    return c.json({ error: 'ai_failed' }, 502);
   }
 
   if (questions.length === 0) {
-    // A IA respondeu, mas não conseguimos extrair perguntas — devolve detalhe p/ diagnóstico.
-    return c.json({ questions: [], raw: aiDetail });
+    // A IA respondeu, mas não conseguimos extrair perguntas.
+    return c.json({ questions: [] });
   }
 
   if (questions.length) {
@@ -635,6 +665,31 @@ patientRoutes.get('/:id/ai-questions', requireClinicalAccess, async (c) => {
 // ---- Biblioteca de arquivos do paciente (armazenados no R2) --------------
 const FILE_CATEGORIES = ['receituario', 'guia', 'laudo', 'outros'];
 const MAX_FILE_BYTES = 15 * 1024 * 1024; // 15 MB (limite de sanidade)
+
+// MIME types permitidos para upload — lista de permissão (allowlist).
+const ALLOWED_MIME_TYPES = new Set([
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/plain',
+]);
+
+// Sanitiza o nome do arquivo: remove caminhos, caracteres especiais perigosos.
+function sanitizeFileName(raw: string): string {
+  // Remove path separators and null bytes; keep only safe characters.
+  return raw
+    .replace(/[\\/\0]/g, '')
+    .replace(/\.\./g, '')
+    .replace(/[^\w.\-\s()À-ɏ]/g, '_')
+    .trim()
+    .slice(0, 200) || 'arquivo';
+}
 
 // Nível de acesso à biblioteca de um paciente:
 //  'full'  -> psicólogo responsável ou compartilhamento ativo (todas as categorias)
@@ -680,8 +735,10 @@ patientRoutes.post('/:id/files', async (c) => {
   const category = (FILE_CATEGORIES.includes(catRaw) ? catRaw : 'outros') as 'receituario' | 'guia' | 'laudo' | 'outros';
   // Secretária só pode enviar guias.
   if (level === 'guia' && category !== 'guia') return c.json({ error: 'forbidden_category' }, 403);
-  const fileName = (c.req.query('fileName') || 'arquivo').slice(0, 200);
-  const mime = (c.req.query('mime') || 'application/octet-stream').slice(0, 120);
+  const fileName = sanitizeFileName(c.req.query('fileName') || 'arquivo');
+  const mimeRaw = (c.req.query('mime') || '').trim().toLowerCase();
+  const mime = ALLOWED_MIME_TYPES.has(mimeRaw) ? mimeRaw : null;
+  if (!mime) return c.json({ error: 'invalid_mime_type' }, 415);
 
   const buf = await c.req.arrayBuffer();
   if (!buf || buf.byteLength === 0) return c.json({ error: 'empty_file' }, 400);
@@ -894,34 +951,4 @@ patientRoutes.post('/ana-chat', blockSecretary, zValidator('json', chatSchema), 
 
   const system =
     ANA_PERSONA +
-    '\n\nCONTEXTO DE USO: você está num CHAT com o psicólogo. Adapte a extensão da resposta à pergunta. ' +
-    'Mantenha um tom gentil e educado, mas seja breve — em conversas normais, responda em poucas frases, de forma calorosa e direta. ' +
-    'Para perguntas pontuais (ex.: "qual a queixa principal?", "resuma a última sessão"), responda de forma direta e objetiva, sem a estrutura completa. ' +
-    'Quando o psicólogo pedir uma ANÁLISE DO CASO, um panorama geral ou um resumo completo do paciente, use a estrutura detalhada abaixo.\n\n' +
-    ANA_FULL_ANALYSIS +
-    '\n\nResponda sempre em português do Brasil. Se a informação pedida não estiver no contexto, diga que não consta nos registros — nunca invente. ' +
-    'Você pode receber o contexto de mais de um paciente (o que está em atendimento e outro que o psicólogo citou pelo nome). Use o contexto do paciente sobre o qual a pergunta se refere.' +
-    patientContext;
-
-  let answer = '';
-  try {
-    const res: any = await c.env.AI.run('@cf/meta/llama-3.3-70b-instruct-fp8-fast', {
-      messages: [{ role: 'system', content: system }, ...messages],
-      max_tokens: 2000,
-      temperature: 0.7,
-    });
-    answer = (res?.response ?? '').toString().trim();
-  } catch (err) {
-    const msg = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
-    console.error('[ana-chat] ERRO:', msg);
-    return c.json({ error: 'ai_failed', detail: msg }, 502);
-  }
-
-  if (!answer) return c.json({ error: 'empty' }, 502);
-  return c.json({ answer });
-  } catch (err) {
-    const msg = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
-    console.error('[ana-chat] ERRO GERAL:', msg);
-    return c.json({ error: 'chat_failed', detail: msg }, 500);
-  }
-});
+    '\n\nCONTEXTO DE USO: você está num CHAT com o psicól

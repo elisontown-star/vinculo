@@ -89,9 +89,10 @@ adminRoutes.post('/users/:id/reset-mfa', async (c) => {
   if (!target) return c.json({ error: 'not_found' }, 404);
   if (target.role === 'platform_admin') return c.json({ error: 'cannot_target_admin' }, 403);
 
+  // Increment tokenVersion to invalidate all existing sessions when MFA is reset.
   await db
     .update(users)
-    .set({ mfaEnabled: false, mfaSecret: null, mfaRecoveryCodes: null })
+    .set({ mfaEnabled: false, mfaSecret: null, mfaRecoveryCodes: null, tokenVersion: (target.tokenVersion ?? 0) + 1 })
     .where(eq(users.id, userId));
 
   const admin = c.get('user');
@@ -119,6 +120,12 @@ adminRoutes.post('/users/:id/reset-password', async (c) => {
   const code = n.toString().padStart(6, '0');
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(code));
   const codeHash = Array.from(new Uint8Array(buf), (b) => b.toString(16).padStart(2, '0')).join('');
+  // Increment tokenVersion to invalidate existing sessions when password is reset.
+  await db
+    .update(users)
+    .set({ tokenVersion: (target.tokenVersion ?? 0) + 1 })
+    .where(eq(users.id, userId));
+
   await c.env.CACHE.put(
     `pwreset:${target.email}`,
     JSON.stringify({ codeHash, tries: 0 }),
@@ -412,15 +419,4 @@ adminRoutes.post('/clinics/:id/plan', zValidator('json', planSchema), async (c) 
 adminRoutes.get('/stats', async (c) => {
   const db = getDb(c.env);
   const clinicCount = await db.select({ n: sql<number>`count(*)` }).from(clinics).get();
-  const userCount = await db.select({ n: sql<number>`count(*)` }).from(users).get();
-  const patientCount = await db
-    .select({ n: sql<number>`count(*)` })
-    .from(patients)
-    .where(isNull(patients.deletedAt))
-    .get();
-  return c.json({
-    clinics: clinicCount?.n ?? 0,
-    users: userCount?.n ?? 0,
-    patients: patientCount?.n ?? 0,
-  });
-});
+  const userCount = a

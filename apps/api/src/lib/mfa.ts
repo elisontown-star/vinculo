@@ -30,9 +30,10 @@ export function verifyTotp(secretBase32: string, token: string): boolean {
 }
 
 // ---- Códigos de recuperação ------------------------------------------------
+// 16 bytes = 128 bits de entropia, representados como 32 hex chars.
 function randomCode(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(5));
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('').slice(0, 10);
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 export function generateRecoveryCodes(n = 8): string[] {
@@ -54,6 +55,4 @@ export async function consumeRecoveryCode(
   storedHashes: string[],
 ): Promise<string[] | null> {
   const h = await sha256(input.replace(/\s+/g, '').toLowerCase());
-  if (!storedHashes.includes(h)) return null;
-  return storedHashes.filter((x) => x !== h);
-}
+  if (!storedHashes.includes(h)) retu

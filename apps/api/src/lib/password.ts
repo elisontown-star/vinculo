@@ -31,5 +31,4 @@ export async function verifyPassword(password: string, stored: string): Promise<
   const [scheme, iterStr, saltB64, hashB64] = stored.split('$');
   if (scheme !== 'pbkdf2') return false;
   const candidate = await derive(password, fromBase64(saltB64), Number(iterStr));
-  return candidate === hashB64;
-}
+  // Constant-time comparison via 

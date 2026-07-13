@@ -23,7 +23,7 @@ import type { AppBindings, Env } from '../types';
 
 export const authRoutes = new Hono<AppBindings>();
 
-type UserRow = { id: string; clinicId: string; role: string; name: string; email: string };
+type UserRow = { id: string; clinicId: string; role: string; name: string; email: string; tokenVersion: number };
 
 // Token curto que autoriza só o passo de MFA (setup ou desafio).
 async function issueStepToken(env: Env, userId: string, purpose: 'setup' | 'challenge'): Promise<string> {
@@ -67,7 +67,7 @@ async function isTrustedDevice(env: Env, userId: string, token: string): Promise
 async function issueToken(env: Env, user: UserRow): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   return sign(
-    { sub: user.id, cid: user.clinicId, role: user.role, iat: now, exp: now + 60 * 60 * 12 },
+    { sub: user.id, cid: user.clinicId, role: user.role, tv: user.tokenVersion ?? 0, iat: now, exp: now + 60 * 60 * 12 },
     env.JWT_SECRET,
     'HS256',
   );
@@ -157,6 +157,11 @@ authRoutes.post('/login', zValidator('json', loginSchema), async (c) => {
 
   const user = await db.select().from(users).where(eq(users.email, email)).get();
   if (!user || !user.isActive) return c.json({ error: 'invalid_credentials' }, 401);
+
+  // Per-user rate limiting (5 attempts per 5 min) to prevent credential stuffing.
+  if (!(await rateLimit(c.env, `login:u:${user.id}`, 5, 300))) {
+    return c.json({ error: 'rate_limited' }, 429);
+  }
 
   const ok = await verifyPassword(password, user.passwordHash);
   if (!ok) return c.json({ error: 'invalid_credentials' }, 401);
@@ -287,6 +292,11 @@ authRoutes.post('/login/mfa', zValidator('json', verifySchema), async (c) => {
   const user = await db.select().from(users).where(eq(users.id, userId)).get();
   if (!user || !user.mfaEnabled || !user.mfaSecret) return c.json({ error: 'invalid_credentials' }, 401);
 
+  // Per-user MFA rate limiting (5 attempts per 5 min).
+  if (!(await rateLimit(c.env, `mfa:u:${user.id}`, 5, 300))) {
+    return c.json({ error: 'rate_limited' }, 429);
+  }
+
   const { code } = c.req.valid('json');
 
   // 1) tenta código do app
@@ -392,19 +402,4 @@ authRoutes.post('/reset-password', zValidator('json', resetSchema), async (c) =>
   // Código válido: troca a senha.
   const db = getDb(c.env);
   const user = await db.select().from(users).where(eq(users.email, email)).get();
-  if (!user) return c.json({ error: 'invalid_or_expired' }, 400);
-
-  const passwordHash = await hashPassword(password);
-  await db.update(users).set({ passwordHash }).where(eq(users.id, user.id));
-  await c.env.CACHE.delete(`pwreset:${email}`);
-
-  await audit(c.env, {
-    clinicId: user.clinicId,
-    actorUserId: user.id,
-    action: 'password_reset',
-    entity: 'user',
-    entityId: user.id,
-  });
-
-  return c.json({ ok: true });
-});
+  if (!use

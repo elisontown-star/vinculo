@@ -46,6 +46,8 @@ export const users = sqliteTable(
     mfaEnabled: integer('mfa_enabled', { mode: 'boolean' }).notNull().default(false),
     // Códigos de recuperação (JSON de hashes) para acesso sem o app.
     mfaRecoveryCodes: text('mfa_recovery_codes'),
+    // Versão do token — incrementada ao revogar sessões (reset de senha, reset de MFA).
+    tokenVersion: integer('token_version').notNull().default(0),
     isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
     createdAt: createdAt(),
   },
@@ -309,10 +311,4 @@ export const patientFiles = sqliteTable(
     mime: text('mime'),
     size: integer('size'),
     r2Key: text('r2_key').notNull(),
-    uploadedBy: text('uploaded_by'),
-    createdAt: createdAt(),
-  },
-  (t) => ({
-    patientIdx: index('patient_files_patient_idx').on(t.patientId),
-  }),
-);
+ 
