@@ -983,4 +983,8 @@ patientRoutes.post('/ana-chat', blockSecretary, zValidator('json', chatSchema), 
   }
 
   return c.json({ reply: result });
+  } catch (err: any) {
+    console.error('[ana-chat] erro:', err);
+    return c.json({ error: 'internal_error' }, 500);
+  }
 });
