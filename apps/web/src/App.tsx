@@ -301,6 +301,7 @@ function Auth({ onDone }: { onDone: () => void }) {
   }
 
   return (
+    <>
     <div className="auth-wrap">
       <div className="auth-controls">
         <Controls />
@@ -446,6 +447,7 @@ function Auth({ onDone }: { onDone: () => void }) {
       </div>
     </div>
     {showTerms && <TermsModal onClose={() => setShowTerms(false)} />}
+  </>
   );
 }
 
