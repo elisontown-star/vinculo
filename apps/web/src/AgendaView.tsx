@@ -92,7 +92,9 @@ export default function AgendaView({ onRegisterSession }: {
     if (patients.length === 0) api.listPatients().then((r) => setPatients(r.patients)).catch(() => {});
     const s = new Date(a.startsAt);
     setError('');
-    setForm({ id: a.id, patientId: a.patientId, psychologistId: a.psychologistId ?? selPsych, date: ymd(s), time: hm(a.startsAt), duration: Math.max(15, Math.round((a.endsAt - a.startsAt) / 60000)), status: a.status, notes: a.notes ?? '' });
+    const rawDur = Math.round((a.endsAt - a.startsAt) / 60000);
+    const duration = rawDur > 0 && rawDur <= 180 ? rawDur : 50;
+    setForm({ id: a.id, patientId: a.patientId, psychologistId: a.psychologistId ?? selPsych, date: ymd(s), time: hm(a.startsAt), duration, status: a.status, notes: a.notes ?? '' });
   }
   async function save() {
     if (!form) return;
@@ -168,6 +170,9 @@ export default function AgendaView({ onRegisterSession }: {
             <button key={a.id} className={`agenda-card lg st-${a.status}`} onClick={() => openEdit(a)}>
               <span className="agenda-time">{hm(a.startsAt)}–{hm(a.endsAt)}</span>
               <span className="agenda-pat">{a.patientName ?? '—'}</span>
+              {a.status === 'done' && <span className="agenda-status-badge">✓ Realizada</span>}
+              {a.status === 'no_show' && <span className="agenda-status-badge">✗ Falta</span>}
+              {a.status === 'canceled' && <span className="agenda-status-badge">Cancelado</span>}
             </button>
           ))}
           {byDay(anchor).length === 0 && <div className="agenda-empty lg" onClick={() => openCreate(anchor)}>{t('agenda.noneDay')}</div>}
@@ -190,6 +195,9 @@ export default function AgendaView({ onRegisterSession }: {
                     <button key={a.id} className={`agenda-card st-${a.status}`} onClick={() => openEdit(a)}>
                       <span className="agenda-time">{hm(a.startsAt)}</span>
                       <span className="agenda-pat">{a.patientName ?? '—'}</span>
+                      {a.status === 'done' && <span className="agenda-status-badge">✓</span>}
+                      {a.status === 'no_show' && <span className="agenda-status-badge">✗</span>}
+                      {a.status === 'canceled' && <span className="agenda-status-badge">–</span>}
                     </button>
                   ))}
                   {dayAppts.length === 0 && <div className="agenda-empty" onClick={() => openCreate(d)}>+</div>}
@@ -295,7 +303,8 @@ export default function AgendaView({ onRegisterSession }: {
                   if (!appt) return;
                   const d = new Date(appt.startsAt);
                   const occurredAt = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-                  const durationMin = Math.round((appt.endsAt - appt.startsAt) / 60000);
+                  const rawDur = Math.round((appt.endsAt - appt.startsAt) / 60000);
+                  const durationMin = rawDur > 0 && rawDur <= 480 ? rawDur : form.duration > 0 && form.duration <= 180 ? form.duration : undefined;
                   setForm(null);
                   onRegisterSession(appt.patientId, { occurredAt, durationMin });
                 }}
