@@ -123,6 +123,107 @@ function TermsModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+const GOOGLE_ERROR_MAP: Record<string, string> = {
+  cancelled: 'Login com Google cancelado.',
+  invalid_state: 'Sessão inválida. Tente novamente.',
+  google_error: 'Erro ao comunicar com o Google. Tente novamente.',
+  account_inactive: 'Conta desativada. Contate o suporte.',
+  clinic_blocked: 'Clínica bloqueada. Contate o suporte.',
+};
+
+function GoogleCompleteForm({ pendingKey, onDone }: { pendingKey: string; onDone: () => void }) {
+  const { t } = useI18n();
+  const [clinicName, setClinicName] = useState('');
+  const [taxIdType, setTaxIdType] = useState<'cnpj' | 'cpf'>('cnpj');
+  const [taxId, setTaxId] = useState('');
+  const [plan, setPlan] = useState<'essencial' | 'pro' | 'plus'>('essencial');
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    if (!termsAccepted) { setError('Você precisa aceitar os Termos de Uso para continuar.'); return; }
+    const taxDigits = taxId.replace(/\D/g, '');
+    if (taxDigits.length !== (taxIdType === 'cpf' ? 11 : 14)) { setError(t('err.invalid_tax_id')); return; }
+    setBusy(true);
+    try {
+      const res = await api.googleComplete({ pendingKey, clinicName, taxIdType, taxId: taxDigits, plan });
+      setToken((res as any).token);
+      setUser((res as any).user);
+      window.history.replaceState({}, '', '/');
+      onDone();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'generic';
+      setError(msg === 'pending_expired' ? 'Sessão expirada. Faça login com Google novamente.' : msg === 'invalid_tax_id' ? t('err.invalid_tax_id') : 'Erro ao criar conta. Tente novamente.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <div className="mfa-wrap">
+        <div className="mfa-topbar"><Brand /><Controls /></div>
+        <div className="mfa-center">
+          <div className="auth-card">
+            <h1>Complete seu cadastro</h1>
+            <p className="sub">Só precisamos de mais algumas informações para criar sua clínica.</p>
+            {error && <div className="error">{error}</div>}
+            <form onSubmit={submit}>
+              <div className="field">
+                <label htmlFor="gc-clinic">{t('lbl.clinicName')}</label>
+                <input id="gc-clinic" value={clinicName} onChange={(e) => setClinicName(e.target.value)} required />
+              </div>
+              <div className="field">
+                <label htmlFor="gc-taxid">{t('lbl.taxId')}</label>
+                <div className="seg">
+                  <button type="button" className={taxIdType === 'cnpj' ? 'on' : ''} onClick={() => { setTaxIdType('cnpj'); setTaxId(''); }}>{t('taxId.cnpj')}</button>
+                  <button type="button" className={taxIdType === 'cpf' ? 'on' : ''} onClick={() => { setTaxIdType('cpf'); setTaxId(''); }}>{t('taxId.cpf')}</button>
+                </div>
+                <input
+                  id="gc-taxid"
+                  inputMode="numeric"
+                  value={taxId}
+                  onChange={(e) => setTaxId(maskTaxId(taxIdType, e.target.value))}
+                  placeholder={taxIdType === 'cnpj' ? '00.000.000/0000-00' : '000.000.000-00'}
+                  required
+                />
+              </div>
+              <div className="field">
+                <label>{t('lbl.plan')}</label>
+                <div className="plan-picker">
+                  {(['essencial', 'pro', 'plus'] as const).map((p) => (
+                    <button type="button" key={p} className={`plan-card ${plan === p ? 'on' : ''}`} onClick={() => setPlan(p)}>
+                      <span className="plan-name">{t('plan.' + p)}</span>
+                      <span className="plan-seats">{t('plan.' + p + '.seats')}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="trial-notice">🎁 {t('auth.trialNotice')}</div>
+              <label className="terms-check-label">
+                <input type="checkbox" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} className="terms-check-input" />
+                <span>Li e aceito os{' '}
+                  <button type="button" className="terms-inline-link" onClick={() => setShowTerms(true)}>Termos de Uso</button>
+                  {' '}e a{' '}
+                  <button type="button" className="terms-inline-link" onClick={() => setShowTerms(true)}>Política de Privacidade</button>
+                </span>
+              </label>
+              <button className="btn" disabled={busy || !termsAccepted}>
+                {busy ? t('btn.wait') : 'Criar minha clínica'}
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+      {showTerms && <TermsModal onClose={() => setShowTerms(false)} />}
+    </>
+  );
+}
+
 function Auth({ onDone }: { onDone: () => void }) {
   const { t, te } = useI18n();
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -139,6 +240,7 @@ function Auth({ onDone }: { onDone: () => void }) {
   const [mfaStep, setMfaStep] = useState<null | { kind: 'setup' | 'challenge'; token: string }>(null);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
+  const [googlePendingKey, setGooglePendingKey] = useState<string | null>(null);
   const resetParams = (() => {
     const p = new URLSearchParams(window.location.search);
     if (p.get('reset') === '1') {
@@ -147,6 +249,34 @@ function Auth({ onDone }: { onDone: () => void }) {
     return null;
   })();
   const [showForgot, setShowForgot] = useState(!!resetParams);
+
+  // Processa retorno do OAuth Google (?gtoken=, ?gpending=, ?gerror=).
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    const gtoken = p.get('gtoken');
+    const guser = p.get('guser');
+    const gpending = p.get('gpending');
+    const gerror = p.get('gerror');
+
+    if (gtoken && guser) {
+      try {
+        setToken(gtoken);
+        setUser(JSON.parse(decodeURIComponent(guser)));
+        window.history.replaceState({}, '', '/');
+        onDone();
+      } catch { /* ignora parse error */ }
+      return;
+    }
+    if (gpending) {
+      window.history.replaceState({}, '', '/');
+      setGooglePendingKey(gpending);
+      return;
+    }
+    if (gerror) {
+      window.history.replaceState({}, '', '/');
+      setError(GOOGLE_ERROR_MAP[gerror] ?? 'Erro ao autenticar com Google.');
+    }
+  }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -220,6 +350,10 @@ function Auth({ onDone }: { onDone: () => void }) {
         </div>
       </div>
     );
+  }
+
+  if (googlePendingKey) {
+    return <GoogleCompleteForm pendingKey={googlePendingKey} onDone={onDone} />;
   }
 
   if (blocked) {
@@ -417,6 +551,21 @@ function Auth({ onDone }: { onDone: () => void }) {
               {busy ? t('btn.wait') : mode === 'register' ? t('btn.createClinic') : t('btn.enter')}
             </button>
           </form>
+
+          <div className="auth-divider"><span>ou</span></div>
+          <button
+            type="button"
+            className="btn-google"
+            onClick={() => { window.location.href = api.googleAuthUrl(); }}
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M17.64 9.2045C17.64 8.5663 17.5827 7.9527 17.4764 7.3636H9V10.845H13.8436C13.635 11.97 13.0009 12.9231 12.0477 13.5613V15.8195H14.9564C16.6582 14.2527 17.64 11.9454 17.64 9.2045Z" fill="#4285F4"/>
+              <path d="M9 18C11.43 18 13.4673 17.1941 14.9564 15.8195L12.0477 13.5613C11.2418 14.1013 10.2109 14.4204 9 14.4204C6.65591 14.4204 4.67182 12.8372 3.96409 10.71H0.957275V13.0418C2.43818 15.9831 5.48182 18 9 18Z" fill="#34A853"/>
+              <path d="M3.96409 10.71C3.78409 10.17 3.68182 9.5931 3.68182 9C3.68182 8.4068 3.78409 7.83 3.96409 7.29V4.9581H0.957275C0.347727 6.1731 0 7.5477 0 9C0 10.4522 0.347727 11.8268 0.957275 13.0418L3.96409 10.71Z" fill="#FBBC05"/>
+              <path d="M9 3.5795C10.3214 3.5795 11.5077 4.0336 12.4405 4.9254L15.0218 2.344C13.4632 0.8918 11.4259 0 9 0C5.48182 0 2.43818 2.0168 0.957275 4.9581L3.96409 7.29C4.67182 5.1627 6.65591 3.5795 9 3.5795Z" fill="#EA4335"/>
+            </svg>
+            {mode === 'register' ? 'Cadastrar com Google' : 'Entrar com Google'}
+          </button>
 
           {mode === 'login' && (
             <button className="link-forgot" type="button" onClick={() => setShowForgot(true)}>

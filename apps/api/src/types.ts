@@ -11,6 +11,9 @@ export interface Env {
   AI: Ai;
   // Armazenamento de arquivos (biblioteca do paciente) no R2.
   DOCS: R2Bucket;
+  // Google OAuth — configurados como secrets no Worker.
+  GOOGLE_CLIENT_ID: string;
+  GOOGLE_CLIENT_SECRET: string;
   // Vectorize (VEC) entra depois, quando o RAG começar.
 }
 

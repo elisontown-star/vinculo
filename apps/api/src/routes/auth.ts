@@ -158,6 +158,9 @@ authRoutes.post('/login', zValidator('json', loginSchema), async (c) => {
   const user = await db.select().from(users).where(eq(users.email, email)).get();
   if (!user || !user.isActive) return c.json({ error: 'invalid_credentials' }, 401);
 
+  // Conta Google-only não tem senha local.
+  if (user.passwordHash === 'google') return c.json({ error: 'google_account' }, 401);
+
   // Per-user rate limiting (5 attempts per 5 min) to prevent credential stuffing.
   if (!(await rateLimit(c.env, `login:u:${user.id}`, 5, 300))) {
     return c.json({ error: 'rate_limited' }, 429);
@@ -421,4 +424,188 @@ authRoutes.post('/reset-password', zValidator('json', resetSchema), async (c) =>
   });
 
   return c.json({ ok: true });
+});
+
+// ---- Google OAuth -----------------------------------------------------------
+
+const GOOGLE_STATE_TTL = 300; // 5 min
+
+// Passo 1: redireciona para a tela de consentimento do Google.
+authRoutes.get('/google', async (c) => {
+  const state = randomToken();
+  await c.env.CACHE.put(`goauth_state:${state}`, '1', { expirationTtl: GOOGLE_STATE_TTL });
+
+  const origin = new URL(c.req.url).origin;
+  const params = new URLSearchParams({
+    client_id: c.env.GOOGLE_CLIENT_ID,
+    redirect_uri: `${origin}/auth/google/callback`,
+    response_type: 'code',
+    scope: 'openid email profile',
+    state,
+    access_type: 'online',
+    prompt: 'select_account',
+  });
+
+  return c.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
+});
+
+// Passo 2: callback do Google — troca code por token e encontra/cria usuário.
+authRoutes.get('/google/callback', async (c) => {
+  const frontendOrigin = c.env.WEB_ORIGIN.split(',')[0].trim();
+  const code = c.req.query('code');
+  const state = c.req.query('state');
+  const error = c.req.query('error');
+
+  if (error || !code || !state) {
+    return c.redirect(`${frontendOrigin}?gerror=cancelled`);
+  }
+
+  // Verifica CSRF state.
+  const stateOk = await c.env.CACHE.get(`goauth_state:${state}`);
+  if (!stateOk) return c.redirect(`${frontendOrigin}?gerror=invalid_state`);
+  await c.env.CACHE.delete(`goauth_state:${state}`);
+
+  // Troca o code por access_token.
+  const origin = new URL(c.req.url).origin;
+  const redirectUri = `${origin}/auth/google/callback`;
+
+  let googleUser: { sub: string; email: string; name: string; picture?: string };
+  try {
+    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code,
+        client_id: c.env.GOOGLE_CLIENT_ID,
+        client_secret: c.env.GOOGLE_CLIENT_SECRET,
+        redirect_uri: redirectUri,
+        grant_type: 'authorization_code',
+      }),
+    });
+    const tokenData: any = await tokenRes.json();
+    if (!tokenData.access_token) throw new Error('no_access_token');
+
+    const userRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` },
+    });
+    googleUser = (await userRes.json()) as any;
+    if (!googleUser.sub || !googleUser.email) throw new Error('missing_fields');
+  } catch {
+    return c.redirect(`${frontendOrigin}?gerror=google_error`);
+  }
+
+  const db = getDb(c.env);
+
+  // Busca por googleId primeiro.
+  let user = await db.select().from(users).where(eq(users.googleId, googleUser.sub)).get();
+
+  // Senão, busca por e-mail e vincula o googleId.
+  if (!user) {
+    const byEmail = await db.select().from(users).where(eq(users.email, googleUser.email)).get();
+    if (byEmail) {
+      user = await db
+        .update(users)
+        .set({ googleId: googleUser.sub })
+        .where(eq(users.id, byEmail.id))
+        .returning()
+        .get();
+    }
+  }
+
+  if (user) {
+    if (!user.isActive) return c.redirect(`${frontendOrigin}?gerror=account_inactive`);
+
+    if (user.role !== 'platform_admin') {
+      const clinic = await db.select().from(clinics).where(eq(clinics.id, user.clinicId)).get();
+      if (clinic) {
+        const expired = clinic.status === 'trial' && clinic.trialEndsAt != null && Date.now() > clinic.trialEndsAt;
+        if (clinic.status === 'blocked' || !clinic.isActive || expired) {
+          if (expired && clinic.status === 'trial') {
+            await db.update(clinics).set({ status: 'blocked' }).where(eq(clinics.id, clinic.id));
+          }
+          return c.redirect(`${frontendOrigin}?gerror=clinic_blocked`);
+        }
+      }
+    }
+
+    const token = await issueToken(c.env, user);
+    const guser = encodeURIComponent(
+      JSON.stringify({ id: user.id, name: user.name, email: user.email, role: user.role, mfaEnabled: !!user.mfaEnabled }),
+    );
+    return c.redirect(`${frontendOrigin}?gtoken=${token}&guser=${guser}`);
+  }
+
+  // Novo usuário Google — precisa completar o cadastro da clínica.
+  const pendingKey = randomToken();
+  await c.env.CACHE.put(
+    `gpending:${pendingKey}`,
+    JSON.stringify({ googleId: googleUser.sub, email: googleUser.email, name: googleUser.name }),
+    { expirationTtl: GOOGLE_STATE_TTL },
+  );
+  return c.redirect(`${frontendOrigin}?gpending=${pendingKey}`);
+});
+
+// Passo 3 (somente novos usuários): finaliza criação da clínica após Google OAuth.
+const googleCompleteSchema = z.object({
+  pendingKey: z.string().min(10),
+  clinicName: z.string().min(2),
+  taxIdType: z.enum(['cnpj', 'cpf']),
+  taxId: z.string().min(11).max(20),
+  plan: z.enum(['essencial', 'pro', 'plus']).default('essencial'),
+});
+
+authRoutes.post('/google/complete', zValidator('json', googleCompleteSchema), async (c) => {
+  const { pendingKey, clinicName, taxIdType, taxId, plan } = c.req.valid('json');
+
+  const raw = await c.env.CACHE.get(`gpending:${pendingKey}`);
+  if (!raw) return c.json({ error: 'pending_expired' }, 400);
+
+  const pending = JSON.parse(raw) as { googleId: string; email: string; name: string };
+  const db = getDb(c.env);
+
+  // Se o e-mail já existe (cadastrado enquanto esperava), só vincula e loga.
+  const existing = await db.select().from(users).where(eq(users.email, pending.email)).get();
+  if (existing) {
+    const linked = await db
+      .update(users)
+      .set({ googleId: pending.googleId })
+      .where(eq(users.id, existing.id))
+      .returning()
+      .get();
+    await c.env.CACHE.delete(`gpending:${pendingKey}`);
+    const token = await issueToken(c.env, linked);
+    return c.json({ token, user: { id: linked.id, name: linked.name, email: linked.email, role: linked.role, mfaEnabled: !!linked.mfaEnabled } });
+  }
+
+  const taxDigits = taxId.replace(/\D/g, '');
+  if (!isValidTaxId(taxIdType, taxDigits)) {
+    return c.json({ error: 'invalid_tax_id' }, 400);
+  }
+
+  let companyCode = generateCompanyCode();
+  for (let i = 0; i < 5; i++) {
+    const clash = await db.select({ id: clinics.id }).from(clinics).where(eq(clinics.companyCode, companyCode)).get();
+    if (!clash) break;
+    companyCode = generateCompanyCode();
+  }
+
+  const TRIAL_DAYS = 7;
+  const trialEndsAt = Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000;
+  const clinic = await db
+    .insert(clinics)
+    .values({ name: clinicName, status: 'trial', trialEndsAt, plan, taxIdType, taxId: taxDigits, companyCode })
+    .returning()
+    .get();
+
+  const user = await db
+    .insert(users)
+    .values({ clinicId: clinic.id, email: pending.email, name: pending.name, passwordHash: 'google', googleId: pending.googleId, role: 'owner' })
+    .returning()
+    .get();
+
+  await c.env.CACHE.delete(`gpending:${pendingKey}`);
+  await audit(c.env, { clinicId: clinic.id, actorUserId: user.id, action: 'register_google', entity: 'clinic', entityId: clinic.id });
+
+  const token = await issueToken(c.env, user);
+  return c.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role, mfaEnabled: !!user.mfaEnabled } }, 201);
 });

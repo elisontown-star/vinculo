@@ -48,6 +48,8 @@ export const users = sqliteTable(
     mfaRecoveryCodes: text('mfa_recovery_codes'),
     // Versão do token — incrementada ao revogar sessões (reset de senha, reset de MFA).
     tokenVersion: integer('token_version').notNull().default(0),
+    // ID do Google para login OAuth. Sentinel 'google' em passwordHash indica conta Google-only.
+    googleId: text('google_id'),
     isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
     createdAt: createdAt(),
   },
