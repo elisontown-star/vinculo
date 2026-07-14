@@ -351,10 +351,11 @@ patientRoutes.post('/:id/sessions', zValidator('json', sessionSchema), async (c)
     entityId: row.id,
   });
 
-  // Auto-completar o agendamento mais próximo do horário da consulta (mesmo dia ±12h).
+  // Sincronizar com a agenda: marcar agendamento existente como realizado
+  // ou criar um novo entry na agenda com status 'done'.
   {
     const targetMs = body.occurredAt ? new Date(body.occurredAt).getTime() : row.occurredAt instanceof Date ? row.occurredAt.getTime() : Number(row.occurredAt);
-    const windowMs = 12 * 60 * 60 * 1000; // 12 horas — cobre o mesmo dia de trabalho
+    const windowMs = 12 * 60 * 60 * 1000; // ±12h
     const candidates = await getDb(c.env)
       .select({ id: appointments.id, startsAt: appointments.startsAt })
       .from(appointments)
@@ -367,7 +368,7 @@ patientRoutes.post('/:id/sessions', zValidator('json', sessionSchema), async (c)
       ))
       .all();
     if (candidates.length > 0) {
-      // Pega o mais próximo do horário da consulta
+      // Marca o agendamento mais próximo como realizado
       const closest = candidates.reduce((a, b) => {
         const aMs = a.startsAt instanceof Date ? a.startsAt.getTime() : Number(a.startsAt);
         const bMs = b.startsAt instanceof Date ? b.startsAt.getTime() : Number(b.startsAt);
@@ -377,6 +378,20 @@ patientRoutes.post('/:id/sessions', zValidator('json', sessionSchema), async (c)
         .update(appointments)
         .set({ status: 'done' })
         .where(eq(appointments.id, closest.id));
+    } else {
+      // Nenhum agendamento encontrado: cria um na agenda já marcado como realizado
+      const durMs = (body.durationMin ?? 50) * 60000;
+      await getDb(c.env)
+        .insert(appointments)
+        .values({
+          clinicId: user.clinicId,
+          patientId: id,
+          psychologistId,
+          startsAt: new Date(targetMs),
+          endsAt: new Date(targetMs + durMs),
+          status: 'done',
+          notes: null,
+        });
     }
   }
 
