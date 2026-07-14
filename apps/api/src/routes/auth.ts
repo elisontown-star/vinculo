@@ -451,7 +451,9 @@ authRoutes.get('/google', async (c) => {
 
 // Passo 2: callback do Google — troca code por token e encontra/cria usuário.
 authRoutes.get('/google/callback', async (c) => {
-  const frontendOrigin = c.env.WEB_ORIGIN.split(',')[0].trim();
+  // Prefere URL de produção (não-localhost) se houver mais de uma origem configurada.
+  const origins = c.env.WEB_ORIGIN.split(',').map((s) => s.trim());
+  const frontendOrigin = origins.find((o) => !o.includes('localhost')) ?? origins[0];
   const code = c.req.query('code');
   const state = c.req.query('state');
   const error = c.req.query('error');
