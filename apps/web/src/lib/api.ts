@@ -265,6 +265,8 @@ export const api = {
   listSessions: (id: string): Promise<{ sessions: Session[] }> => req(`/patients/${id}/sessions`),
   createSession: (id: string, b: NewSession): Promise<{ session: Session }> =>
     req(`/patients/${id}/sessions`, { method: 'POST', body: JSON.stringify(b) }),
+  updateSession: (patientId: string, sessionId: string, b: Partial<NewSession>): Promise<{ session: Session }> =>
+    req(`/patients/${patientId}/sessions/${sessionId}`, { method: 'PATCH', body: JSON.stringify(b) }),
   patientUpcomingAppointments: (id: string): Promise<{ appointments: { id: string; startsAt: number; endsAt: number; notes?: string | null }[] }> =>
     req(`/patients/${id}/upcoming-appointments`),
 

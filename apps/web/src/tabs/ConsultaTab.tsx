@@ -310,6 +310,131 @@ function Panorama({ sessions }: { sessions: Session[] }) {
   );
 }
 
+// ── Formulário de edição de consulta existente ───────────────────────────────
+function EditSessionForm({
+  session: s,
+  patientId,
+  onSaved,
+  onCancel,
+}: {
+  session: Session;
+  patientId: string;
+  onSaved: () => void;
+  onCancel: () => void;
+}) {
+  const { t, o, te } = useI18n();
+  const toLocal = (ms: number) => {
+    const d = new Date(ms);
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  };
+  const [form, setForm] = useState<NewSession & { occurredAt: string }>({
+    occurredAt: toLocal(s.occurredAt),
+    durationMin: s.durationMin ?? undefined,
+    mood: s.mood ?? undefined,
+    topics: s.topics ?? [],
+    objectives: s.objectives ?? undefined,
+    techniques: s.techniques ?? undefined,
+    evolution: s.evolution ?? undefined,
+    nextSteps: s.nextSteps ?? undefined,
+    freeNotes: s.freeNotes ?? undefined,
+  });
+  const [scale, setScale] = useState<number | null>(s.emotionalScale ?? null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  function set<K extends keyof NewSession>(k: K, v: NewSession[K]) {
+    setForm((f) => ({ ...f, [k]: v }));
+  }
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError('');
+    try {
+      await api.updateSession(patientId, s.id, {
+        ...form,
+        occurredAt: new Date(form.occurredAt).toISOString(),
+        emotionalScale: scale ?? undefined,
+      });
+      onSaved();
+    } catch (err) {
+      setError(te(err instanceof Error ? err.message : 'generic'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form className="session-form sc-edit-form" onSubmit={save}>
+      {error && <div className="error">{error}</div>}
+      <div className="row2">
+        <div className="field">
+          <label>{t('c.datetime')}</label>
+          <input className="date" type="datetime-local" value={form.occurredAt}
+            onChange={(e) => set('occurredAt', e.target.value)} />
+        </div>
+        <div className="field">
+          <label>{t('c.duration')}</label>
+          <input type="number" min={1} max={600} placeholder={t('ph.duration')}
+            value={form.durationMin ?? ''}
+            onChange={(e) => set('durationMin', e.target.value ? Number(e.target.value) : undefined)} />
+        </div>
+      </div>
+      <div className="row2">
+        <div className="field">
+          <label>{t('c.mood')}</label>
+          <div className="chips">
+            {o('moods').map((m) => (
+              <button type="button" key={m}
+                className={`chip ${form.mood === m ? 'on' : ''}`}
+                onClick={() => set('mood', form.mood === m ? undefined : m)}>{m}</button>
+            ))}
+          </div>
+        </div>
+        <div className="field">
+          <label>{t('c.scale')}</label>
+          <ScalePicker value={scale} onChange={setScale} />
+        </div>
+      </div>
+      <div className="field">
+        <label>{t('c.objectives')}</label>
+        <input placeholder={t('ph.objectives')} value={form.objectives ?? ''}
+          onChange={(e) => set('objectives', e.target.value)} />
+      </div>
+      <div className="field">
+        <label>{t('c.topics')}</label>
+        <TopicInput topics={form.topics ?? []} onChange={(tp) => set('topics', tp)} />
+      </div>
+      <div className="field">
+        <label>{t('c.evolution')}</label>
+        <textarea rows={3} placeholder={t('ph.evolution')} value={form.evolution ?? ''}
+          onChange={(e) => set('evolution', e.target.value)} />
+      </div>
+      <div className="row2">
+        <div className="field">
+          <label>{t('c.techniques')}</label>
+          <input placeholder={t('ph.techniques')} value={form.techniques ?? ''}
+            onChange={(e) => set('techniques', e.target.value)} />
+        </div>
+        <div className="field">
+          <label>{t('c.nextSteps')}</label>
+          <input placeholder={t('ph.nextSteps')} value={form.nextSteps ?? ''}
+            onChange={(e) => set('nextSteps', e.target.value)} />
+        </div>
+      </div>
+      <div className="field">
+        <label>{t('c.freeNotes')}</label>
+        <textarea rows={2} placeholder={t('ph.freeNotes')} value={form.freeNotes ?? ''}
+          onChange={(e) => set('freeNotes', e.target.value)} />
+      </div>
+      <div className="sc-edit-actions">
+        <button type="button" className="ghost sm" onClick={onCancel} disabled={busy}>{t('btn.cancel')}</button>
+        <button className="btn sm" disabled={busy}>{busy ? t('btn.saving') : 'Salvar alterações'}</button>
+      </div>
+    </form>
+  );
+}
+
 // ── Cartão de consulta com accordion ─────────────────────────────────────────
 function SessionCard({
   session: s,
@@ -317,15 +442,20 @@ function SessionCard({
   onToggle,
   isSecretary,
   lang,
+  patientId,
+  onSaved,
 }: {
   session: Session;
   expanded: boolean;
   onToggle: () => void;
   isSecretary: boolean;
   lang: string;
+  patientId: string;
+  onSaved: () => void;
 }) {
   const { t } = useI18n();
   const locale = LOCALE[lang as keyof typeof LOCALE];
+  const [editing, setEditing] = useState(false);
 
   const fmtDate = (ms: number) =>
     new Date(ms).toLocaleDateString(locale, { day: '2-digit', month: 'short', year: 'numeric' });
@@ -336,7 +466,7 @@ function SessionCard({
 
   return (
     <div className={`sc-card ${expanded ? 'sc-open' : ''}`}>
-      <button className="sc-head" type="button" onClick={onToggle}>
+      <button className="sc-head" type="button" onClick={() => { onToggle(); setEditing(false); }}>
         <div className="sc-head-left">
           <span className="sc-date">{fmtDate(s.occurredAt)}</span>
           <span className="sc-time">{fmtTime(s.occurredAt)}</span>
@@ -359,7 +489,7 @@ function SessionCard({
         </svg>
       </button>
 
-      {expanded && (
+      {expanded && !editing && (
         <div className="sc-body">
           {!isSecretary && s.topics && s.topics.length > 0 && (
             <div className="sc-field">
@@ -400,7 +530,21 @@ function SessionCard({
           {!s.freeNotes && !s.evolution && !s.objectives && !s.topics?.length && !s.techniques && !s.nextSteps && (
             <p className="sc-empty-detail">{t('c.noDetail')}</p>
           )}
+          {!isSecretary && (
+            <button type="button" className="sc-edit-btn" onClick={() => setEditing(true)}>
+              ✏️ Editar consulta
+            </button>
+          )}
         </div>
+      )}
+
+      {expanded && editing && (
+        <EditSessionForm
+          session={s}
+          patientId={patientId}
+          onSaved={() => { setEditing(false); onSaved(); }}
+          onCancel={() => setEditing(false)}
+        />
       )}
     </div>
   );
@@ -411,10 +555,14 @@ function SessionHistory({
   sessions,
   loading,
   isSecretary,
+  patientId,
+  onSaved,
 }: {
   sessions: Session[];
   loading: boolean;
   isSecretary: boolean;
+  patientId: string;
+  onSaved: () => void;
 }) {
   const { t, lang } = useI18n();
   const [search, setSearch] = useState('');
@@ -480,6 +628,8 @@ function SessionHistory({
               onToggle={() => toggle(s.id)}
               isSecretary={isSecretary}
               lang={lang}
+              patientId={patientId}
+              onSaved={onSaved}
             />
           ))}
         </div>
@@ -552,7 +702,7 @@ export default function ConsultaTab({
       {mode === 'history' && (
         <div className="consulta-hist-view">
           {!isSecretary && <Panorama sessions={sessions} />}
-          <SessionHistory sessions={sessions} loading={loadingSessions} isSecretary={isSecretary} />
+          <SessionHistory sessions={sessions} loading={loadingSessions} isSecretary={isSecretary} patientId={patientId} onSaved={onSaved} />
         </div>
       )}
     </div>

@@ -250,6 +250,10 @@ input, textarea, select, button { font-family: inherit; }
 .btn-register-session { width: 100%; padding: 8px; margin-bottom: 8px; background: color-mix(in srgb, var(--brand) 8%, transparent); border: 1px solid color-mix(in srgb, var(--brand) 30%, transparent); border-radius: 8px; color: var(--brand); font-size: 13px; font-weight: 600; cursor: pointer; transition: background .15s; }
 .btn-register-session:hover { background: color-mix(in srgb, var(--brand) 14%, transparent); }
 .agenda-status-badge { font-size: 10px; font-weight: 700; margin-top: 2px; opacity: .85; }
+.sc-edit-btn { margin-top: 10px; padding: 5px 14px; background: transparent; border: 1px solid var(--line); border-radius: 6px; color: var(--brand); font-size: 12px; font-weight: 600; cursor: pointer; transition: background .15s; }
+.sc-edit-btn:hover { background: color-mix(in srgb, var(--brand) 6%, transparent); }
+.sc-edit-form { margin-top: 8px; background: color-mix(in srgb, var(--brand) 3%, transparent); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+.sc-edit-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
 
 /* Ficha */
 .ficha-tab { max-width: 880px; }

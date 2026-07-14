@@ -398,6 +398,42 @@ patientRoutes.post('/:id/sessions', zValidator('json', sessionSchema), async (c)
   return c.json({ session: serializeSession(row) }, 201);
 });
 
+// ---- Editar consulta (psicólogo / owner) ------------------------------------
+patientRoutes.patch('/:id/sessions/:sid', blockSecretary, zValidator('json', sessionSchema.partial()), async (c) => {
+  const user = c.get('user');
+  const id = c.req.param('id');
+  const sid = c.req.param('sid');
+  const grantors = await activeGrantors(c, user);
+  const patient = await findPatient(c, user, id);
+  if (!patient || !hasClinicalAccess(user, patient, grantors)) return c.json({ error: 'forbidden_clinical' }, 403);
+  const body = c.req.valid('json');
+  const existing = await getDb(c.env)
+    .select()
+    .from(sessions)
+    .where(and(eq(sessions.id, sid), eq(sessions.patientId, id), eq(sessions.clinicId, user.clinicId)))
+    .get();
+  if (!existing) return c.json({ error: 'not_found' }, 404);
+  const updates: Record<string, any> = {};
+  if (body.occurredAt !== undefined) updates.occurredAt = new Date(body.occurredAt);
+  if (body.durationMin !== undefined) updates.durationMin = body.durationMin;
+  if (body.mood !== undefined) updates.mood = body.mood;
+  if (body.emotionalScale !== undefined) updates.emotionalScale = body.emotionalScale;
+  if (body.topics !== undefined) updates.topics = body.topics.length ? JSON.stringify(body.topics) : null;
+  if (body.objectives !== undefined) updates.objectives = body.objectives;
+  if (body.techniques !== undefined) updates.techniques = body.techniques;
+  if (body.evolution !== undefined) updates.evolution = body.evolution;
+  if (body.nextSteps !== undefined) updates.nextSteps = body.nextSteps;
+  if (body.freeNotes !== undefined) updates.freeNotes = body.freeNotes;
+  const row = await getDb(c.env)
+    .update(sessions)
+    .set(updates)
+    .where(eq(sessions.id, sid))
+    .returning()
+    .get();
+  await audit(c.env, { clinicId: user.clinicId, actorUserId: user.userId, action: 'update', entity: 'session', entityId: sid });
+  return c.json({ session: serializeSession(row) });
+});
+
 // ---- Agendamentos futuros do paciente (para pré-preencher consulta) ----------
 patientRoutes.get('/:id/upcoming-appointments', async (c) => {
   const user = c.get('user');
