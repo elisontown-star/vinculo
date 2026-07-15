@@ -296,7 +296,7 @@ patientRoutes.get('/:id/sessions', async (c) => {
   const rows = await getDb(c.env)
     .select()
     .from(sessions)
-    .where(eq(sessions.patientId, id))
+    .where(and(eq(sessions.patientId, id), eq(sessions.clinicId, user.clinicId)))
     .orderBy(desc(sessions.occurredAt))
     .all();
   const serialize = secretary
@@ -475,7 +475,7 @@ patientRoutes.get('/:id/timeline', requireClinicalAccess, async (c) => {
   const rows = await getDb(c.env)
     .select()
     .from(timelineEvents)
-    .where(eq(timelineEvents.patientId, id))
+    .where(and(eq(timelineEvents.patientId, id), eq(timelineEvents.clinicId, user.clinicId)))
     .orderBy(asc(timelineEvents.eventDate))
     .all();
   return c.json({ events: rows });
@@ -702,13 +702,13 @@ patientRoutes.get('/:id/ai-questions', requireClinicalAccess, async (c) => {
   const patient = { fullName: patientRow.fullName, birthDate: patientRow.birthDate, profile };
   const sessRows = await db
     .select().from(sessions)
-    .where(eq(sessions.patientId, id))
+    .where(and(eq(sessions.patientId, id), eq(sessions.clinicId, user.clinicId)))
     .orderBy(desc(sessions.occurredAt))
     .all();
   const sess = sessRows.map(serializeSession);
   const eventRows = await db
     .select().from(timelineEvents)
-    .where(eq(timelineEvents.patientId, id))
+    .where(and(eq(timelineEvents.patientId, id), eq(timelineEvents.clinicId, user.clinicId)))
     .orderBy(asc(timelineEvents.eventDate))
     .all();
 
@@ -979,6 +979,16 @@ patientRoutes.delete('/:id/permanent', blockSecretary, async (c) => {
   if (!row) return c.json({ error: 'not_found' }, 404);
 
   const db = getDb(c.env);
+
+  // C2: Apagar blobs do R2 antes de remover as linhas (evita órfãos).
+  const r2Files = await db
+    .select({ r2Key: patientFiles.r2Key })
+    .from(patientFiles)
+    .where(eq(patientFiles.patientId, id))
+    .all();
+  await Promise.allSettled(r2Files.map((f) => c.env.DOCS.delete(f.r2Key)));
+  await db.delete(patientFiles).where(eq(patientFiles.patientId, id));
+
   await db.delete(timelineEvents).where(eq(timelineEvents.patientId, id));
   await db.delete(sessions).where(eq(sessions.patientId, id));
   await db.delete(patients).where(and(eq(patients.id, id), eq(patients.clinicId, user.clinicId)));
@@ -1064,6 +1074,7 @@ patientRoutes.post('/ana-chat', blockSecretary, zValidator('json', chatSchema), 
         .select()
         .from(patients)
         .where(and(eq(patients.clinicId, user.clinicId), isNull(patients.deletedAt), vis))
+        .limit(200)
         .all();
       const match = all.find((pt) => {
         if (pt.id === patientId) return false;

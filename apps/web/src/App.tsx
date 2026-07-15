@@ -640,4 +640,7 @@ export default function App() {
   return (
     <>
       {content}
-      {mfaPrompt && <MfaEnablePrompt onClose={() => 
+      {mfaPrompt && <MfaEnablePrompt onClose={() => setMfaPrompt(false)} />}
+    </>
+  );
+}

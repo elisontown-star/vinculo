@@ -13,7 +13,7 @@ const clinRoles = requireRole('owner', 'psychologist');
 const toMs = (v: unknown) => (v instanceof Date ? v.getTime() : v == null ? null : Number(v));
 
 // Conceder acesso aos meus pacientes a um colega (opcional: até uma data).
-const createSchema = z.object({ granteeId: z.string(), expiresAt: z.number().nullable().optional() });
+const createSchema = z.object({ granteeId: z.string(), expiresAt: z.number().nullable().optional().refine((v) => v == null || v > Date.now(), { message: 'expires_in_past' }) });
 sharesRoutes.post('/', requireAuth, clinRoles, zValidator('json', createSchema), async (c) => {
   const user = c.get('user');
   const db = getDb(c.env);

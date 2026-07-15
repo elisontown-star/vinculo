@@ -299,4 +299,7 @@ export const api = {
     req(`/patients/${id}/permanent`, { method: 'DELETE' }),
 
   anaChat: (
-    body: { patientId?: string; messages: { role
+    body: { patientId?: string; messages: { role: 'user' | 'assistant'; content: string }[] },
+  ): Promise<{ answer: string }> =>
+    req('/patients/ana-chat', { method: 'POST', body: JSON.stringify(body) }),
+};
