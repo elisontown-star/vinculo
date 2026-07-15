@@ -50,4 +50,4 @@ app.route('/appointments', appointmentRoutes);
 app.route('/meta', metaRoutes);
 app.route('/shares', sharesRoutes);
 
-app
+export default app;
