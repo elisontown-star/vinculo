@@ -37,30 +37,28 @@ export async function sendInviteEmail(env: Env, to: string, name: string, clinic
 }
 
 export async function sendPasswordResetEmail(env: Env, to: string, code: string): Promise<void> {
-  // Link que abre a tela de redefinição já com e-mail e código preenchidos.
-  const link = `${APP_URL}/?reset=1&email=${encodeURIComponent(to)}&code=${code}`;
+  // O link abre apenas a tela de redefinição com o e-mail pré-preenchido.
+  // O código NÃO vai na URL para não vazar em logs, histórico ou header Referer.
+  const link = `${APP_URL}/?reset=1&email=${encodeURIComponent(to)}`;
 
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
       <h2 style="color:#1a2960; margin:0 0 8px;">Redefinição de senha</h2>
       <p style="color:#444; font-size:14px; line-height:1.5;">
-        Você solicitou a redefinição da sua senha no Vínculo. Clique no botão abaixo
-        para criar uma nova senha — o código já vai preenchido:
+        Você solicitou a redefinição da sua senha no Vínculo. Use o código abaixo
+        na tela de redefinição para criar uma nova senha:
       </p>
-      <div style="text-align:center; margin:22px 0;">
-        <a href="${link}" style="display:inline-block; background:#1a2960; color:#fff;
-           text-decoration:none; font-size:15px; font-weight:bold; padding:14px 28px;
-           border-radius:10px;">Criar nova senha</a>
-      </div>
-      <p style="color:#444; font-size:13px; line-height:1.5;">
-        Ou use o código manualmente na tela de redefinição:
-      </p>
-      <div style="font-size:26px; font-weight:bold; letter-spacing:6px; color:#1a2960;
-                  background:#f4f6fb; text-align:center; padding:14px; border-radius:10px; margin:10px 0;">
+      <div style="font-size:28px; font-weight:bold; letter-spacing:8px; color:#1a2960;
+                  background:#f4f6fb; text-align:center; padding:16px; border-radius:10px; margin:20px 0;">
         ${code}
       </div>
+      <div style="text-align:center; margin:18px 0;">
+        <a href="${link}" style="display:inline-block; background:#1a2960; color:#fff;
+           text-decoration:none; font-size:15px; font-weight:bold; padding:14px 28px;
+           border-radius:10px;">Ir para a tela de redefinição</a>
+      </div>
       <p style="color:#888; font-size:12.5px; line-height:1.5;">
-        Este link e código expiram em 15 minutos. Se você não solicitou, ignore este e-mail —
+        Este código expira em 15 minutos. Se você não solicitou, ignore este e-mail —
         sua senha continua a mesma.
       </p>
     </div>

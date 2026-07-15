@@ -21,6 +21,7 @@ export interface AuthUser {
   userId: string;
   clinicId: string;
   role: string;
+  name: string;
 }
 
 export type AppBindings = {

@@ -151,6 +151,8 @@ export const api = {
   register: (b: unknown) => req('/auth/register', { method: 'POST', body: JSON.stringify(b) }),
   login: (b: unknown) => req('/auth/login', { method: 'POST', headers: { 'X-Device-Token': getDeviceToken() }, body: JSON.stringify(b) }),
   googleAuthUrl: () => `${BASE}/auth/google`,
+  googleExchange: (code: string): Promise<{ token: string; user: unknown }> =>
+    req('/auth/google/exchange', { method: 'POST', body: JSON.stringify({ code }) }),
   googleComplete: (b: { pendingKey: string; clinicName: string; taxIdType: 'cnpj' | 'cpf'; taxId: string; plan: 'essencial' | 'pro' | 'plus' }): Promise<{ token: string; user: unknown }> =>
     req('/auth/google/complete', { method: 'POST', body: JSON.stringify(b) }),
 
@@ -297,7 +299,4 @@ export const api = {
     req(`/patients/${id}/permanent`, { method: 'DELETE' }),
 
   anaChat: (
-    body: { patientId?: string; messages: { role: 'user' | 'assistant'; content: string }[] },
-  ): Promise<{ answer: string }> =>
-    req('/patients/ana-chat', { method: 'POST', body: JSON.stringify(body) }),
-};
+    body: { patientId?: string; messages: { role

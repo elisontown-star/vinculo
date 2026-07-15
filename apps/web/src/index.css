@@ -1207,15 +1207,3 @@ body { line-height: 1.55; letter-spacing: -0.005em; }
 .bib-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 .bib-del { background: none; border: none; color: var(--muted); cursor: pointer; padding: 6px; border-radius: 6px; display: inline-flex; }
 .bib-del:hover { background: #fdecec; color: #c0392b; }
-
-/* --- Google OAuth button --------------------------------------------------- */
-.auth-divider { display: flex; align-items: center; gap: 10px; margin: 16px 0 12px; color: var(--muted); font-size: 12px; }
-.auth-divider::before, .auth-divider::after { content: ''; flex: 1; height: 1px; background: var(--line); }
-.btn-google {
-  width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px;
-  padding: 10px 16px; border: 1px solid var(--line); border-radius: var(--radius-sm);
-  background: var(--surface); color: var(--ink); font-size: 14px; font-weight: 600;
-  cursor: pointer; transition: background .15s, border-color .15s;
-}
-.btn-google:hover { background: var(--bg); border-color: #bbc0d0; }
-.btn-google:active { background: #eef0f5; }

@@ -15,8 +15,8 @@ const app = new Hono<AppBindings>();
 // Cabeçalhos de segurança.
 app.use('*', secureHeaders());
 
-// CORS: em desenvolvimento libera qualquer localhost/127.0.0.1 (qualquer porta);
-// em produção, restringe às origens de WEB_ORIGIN (várias separadas por vírgula).
+// CORS: em desenvolvimento libera localhost; em produção restringe às origens
+// de WEB_ORIGIN. Localhost só é permitido quando APP_ENV !== 'production'.
 app.use('*', (c, next) =>
   cors({
     origin: (origin) => {
@@ -24,9 +24,9 @@ app.use('*', (c, next) =>
         .split(',')
         .map((s) => s.trim())
         .filter(Boolean);
-      const ok =
-        /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin) ||
-        allowed.includes(origin);
+      const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+      const isDev = c.env.APP_ENV !== 'production';
+      const ok = (isLocalhost && isDev) || allowed.includes(origin);
       return ok ? origin : (allowed[0] ?? null);
     },
     allowHeaders: ['Content-Type', 'Authorization', 'X-Device-Token'],
@@ -50,6 +50,4 @@ app.route('/appointments', appointmentRoutes);
 app.route('/meta', metaRoutes);
 app.route('/shares', sharesRoutes);
 
-app.notFound((c) => c.json({ error: 'not_found' }, 404));
-
-export default app;
+app

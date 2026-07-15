@@ -14,6 +14,7 @@ import {
   appointments,
   consents,
   documents,
+  patientFiles,
 } from '@vinculo/db/schema';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { sendPasswordResetEmail } from '../lib/email';
@@ -279,10 +280,17 @@ adminRoutes.post('/clinics/:id/delete', zValidator('json', deleteClinicSchema), 
     },
   });
 
-  // 6) Exclusão em cascata, atômica. Ordem filho → pai (segura para FKs).
-  // NOTA: quando o R2 for ligado (documents.r2Key), apagar os blobs do bucket
-  // AQUI antes de remover as linhas, para não deixar arquivos órfãos.
+  // 6a) Apagar blobs do R2 antes de remover as linhas do banco (evita órfãos).
+  const r2Files = await db
+    .select({ r2Key: patientFiles.r2Key })
+    .from(patientFiles)
+    .where(eq(patientFiles.clinicId, clinicId))
+    .all();
+  await Promise.allSettled(r2Files.map((f) => c.env.DOCS.delete(f.r2Key)));
+
+  // 6b) Exclusão em cascata, atômica. Ordem filho → pai (segura para FKs).
   await db.batch([
+    db.delete(patientFiles).where(eq(patientFiles.clinicId, clinicId)),
     db.delete(documents).where(eq(documents.clinicId, clinicId)),
     db.delete(consents).where(eq(consents.clinicId, clinicId)),
     db.delete(appointments).where(eq(appointments.clinicId, clinicId)),

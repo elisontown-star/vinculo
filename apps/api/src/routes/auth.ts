@@ -49,18 +49,20 @@ function randomToken(): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-async function trustDevice(env: Env, userId: string): Promise<string> {
+// O token inclui a tokenVersion atual: ao incrementar a versão (reset de senha,
+// reset de MFA), todos os dispositivos confiáveis são automaticamente invalidados
+// porque a chave no KV muda — sem precisar fazer delete explícito.
+async function trustDevice(env: Env, userId: string, tokenVersion: number): Promise<string> {
   const token = randomToken();
-  // Chave por usuário+token; expira automaticamente após o prazo.
-  await env.CACHE.put(`trustdev:${userId}:${token}`, '1', {
+  await env.CACHE.put(`trustdev:${userId}:${tokenVersion}:${token}`, '1', {
     expirationTtl: TRUSTED_DEVICE_DAYS * 24 * 60 * 60,
   });
   return token;
 }
 
-async function isTrustedDevice(env: Env, userId: string, token: string): Promise<boolean> {
+async function isTrustedDevice(env: Env, userId: string, tokenVersion: number, token: string): Promise<boolean> {
   if (!token || token.length < 32) return false;
-  const v = await env.CACHE.get(`trustdev:${userId}:${token}`);
+  const v = await env.CACHE.get(`trustdev:${userId}:${tokenVersion}:${token}`);
   return v === '1';
 }
 
@@ -192,7 +194,7 @@ authRoutes.post('/login', zValidator('json', loginSchema), async (c) => {
 
   // Dispositivo confiável: se o navegador enviou um deviceToken válido, pula o MFA.
   const deviceToken = c.req.header('X-Device-Token') ?? '';
-  if (deviceToken && (await isTrustedDevice(c.env, user.id, deviceToken))) {
+  if (deviceToken && (await isTrustedDevice(c.env, user.id, user.tokenVersion ?? 0, deviceToken))) {
     const token = await issueToken(c.env, user);
     return c.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role, mfaEnabled: !!user.mfaEnabled } });
   }
@@ -319,7 +321,7 @@ authRoutes.post('/login/mfa', zValidator('json', verifySchema), async (c) => {
 
   const { trustDevice: trust } = c.req.valid('json');
   let deviceToken: string | undefined;
-  if (trust) deviceToken = await trustDevice(c.env, user.id);
+  if (trust) deviceToken = await trustDevice(c.env, user.id, user.tokenVersion ?? 0);
 
   const token = await issueToken(c.env, user);
   return c.json({ token, deviceToken, user: { id: user.id, name: user.name, email: user.email, role: user.role, mfaEnabled: !!user.mfaEnabled } });
@@ -530,11 +532,15 @@ authRoutes.get('/google/callback', async (c) => {
       }
     }
 
-    const token = await issueToken(c.env, user);
-    const guser = encodeURIComponent(
-      JSON.stringify({ id: user.id, name: user.name, email: user.email, role: user.role, mfaEnabled: !!user.mfaEnabled }),
+    // Código de uso único (30s) — evita expor token e dados na URL/histórico.
+    const jwtToken = await issueToken(c.env, user);
+    const oauthCode = randomToken();
+    await c.env.CACHE.put(
+      `goauth_code:${oauthCode}`,
+      JSON.stringify({ token: jwtToken, user: { id: user.id, name: user.name, email: user.email, role: user.role, mfaEnabled: !!user.mfaEnabled } }),
+      { expirationTtl: 30 },
     );
-    return c.redirect(`${frontendOrigin}?gtoken=${token}&guser=${guser}`);
+    return c.redirect(`${frontendOrigin}?gcode=${oauthCode}`);
   }
 
   // Novo usuário Google — precisa completar o cadastro da clínica.
@@ -545,6 +551,17 @@ authRoutes.get('/google/callback', async (c) => {
     { expirationTtl: GOOGLE_STATE_TTL },
   );
   return c.redirect(`${frontendOrigin}?gpending=${pendingKey}`);
+});
+
+// Passo 2b: frontend troca o código de uso único pelo JWT real (código nunca fica na URL).
+authRoutes.post('/google/exchange', async (c) => {
+  const body = await c.req.json().catch(() => ({})) as { code?: string };
+  if (!body.code) return c.json({ error: 'missing_code' }, 400);
+  const raw = await c.env.CACHE.get(`goauth_code:${body.code}`);
+  if (!raw) return c.json({ error: 'invalid_or_expired_code' }, 400);
+  await c.env.CACHE.delete(`goauth_code:${body.code}`);
+  const { token, user } = JSON.parse(raw);
+  return c.json({ token, user });
 });
 
 // Passo 3 (somente novos usuários): finaliza criação da clínica após Google OAuth.
@@ -578,6 +595,7 @@ authRoutes.post('/google/complete', zValidator('json', googleCompleteSchema), as
     const token = await issueToken(c.env, linked);
     return c.json({ token, user: { id: linked.id, name: linked.name, email: linked.email, role: linked.role, mfaEnabled: !!linked.mfaEnabled } });
   }
+
 
   const taxDigits = taxId.replace(/\D/g, '');
   if (!isValidTaxId(taxIdType, taxDigits)) {

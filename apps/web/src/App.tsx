@@ -244,27 +244,29 @@ function Auth({ onDone }: { onDone: () => void }) {
   const resetParams = (() => {
     const p = new URLSearchParams(window.location.search);
     if (p.get('reset') === '1') {
-      return { email: p.get('email') ?? '', code: p.get('code') ?? '' };
+      return { email: p.get('email') ?? '' };
     }
     return null;
   })();
   const [showForgot, setShowForgot] = useState(!!resetParams);
 
-  // Processa retorno do OAuth Google (?gtoken=, ?gpending=, ?gerror=).
+  // Processa retorno do OAuth Google (?gcode=, ?gpending=, ?gerror=).
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
-    const gtoken = p.get('gtoken');
-    const guser = p.get('guser');
+    const gcode = p.get('gcode');
     const gpending = p.get('gpending');
     const gerror = p.get('gerror');
 
-    if (gtoken && guser) {
-      try {
-        setToken(gtoken);
-        setUser(JSON.parse(decodeURIComponent(guser)));
-        window.history.replaceState({}, '', '/');
-        onDone();
-      } catch { /* ignora parse error */ }
+    if (gcode) {
+      // Limpa a URL imediatamente para não vazar o código no histórico.
+      window.history.replaceState({}, '', '/');
+      api.googleExchange(gcode)
+        .then((res: any) => {
+          setToken(res.token);
+          setUser(res.user);
+          onDone();
+        })
+        .catch(() => setError('Erro ao completar login com Google. Tente novamente.'));
       return;
     }
     if (gpending) {
@@ -395,7 +397,6 @@ function Auth({ onDone }: { onDone: () => void }) {
                 window.history.replaceState({}, '', '/');
               }}
               initialEmail={resetParams?.email}
-              initialCode={resetParams?.code}
             />
           </div>
         </div>
@@ -639,7 +640,4 @@ export default function App() {
   return (
     <>
       {content}
-      {mfaPrompt && <MfaEnablePrompt onClose={() => setMfaPrompt(false)} />}
-    </>
-  );
-}
+      {mfaPrompt && <MfaEnablePrompt onClose={() => 

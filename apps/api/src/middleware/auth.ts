@@ -28,15 +28,16 @@ export const requireAuth = createMiddleware<AppBindings>(async (c, next) => {
   }
 
   // Validate tokenVersion to support session revocation (password/MFA resets).
+  // Fail-closed: tokens without 'tv' are rejected — no bypass via crafted JWTs.
   const tokenVersion = typeof payload.tv === 'number' ? payload.tv : null;
-  if (tokenVersion !== null) {
-    const row = await c.env.DB
-      .prepare('SELECT token_version FROM users WHERE id = ? LIMIT 1')
-      .bind(String(payload.sub))
-      .first<{ token_version: number }>();
-    if (!row || row.token_version !== tokenVersion) {
-      return c.json({ error: 'token_revoked' }, 401);
-    }
+  if (tokenVersion === null) return c.json({ error: 'invalid_token' }, 401);
+
+  const row = await c.env.DB
+    .prepare('SELECT token_version FROM users WHERE id = ? LIMIT 1')
+    .bind(String(payload.sub))
+    .first<{ token_version: number }>();
+  if (!row || row.token_version !== tokenVersion) {
+    return c.json({ error: 'token_revoked' }, 401);
   }
 
   c.set('user', {
