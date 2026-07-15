@@ -34,13 +34,26 @@ app.use('*', (c, next) =>
   })(c, next),
 );
 
-app.get('/health', (c) =>
-  c.json({
-    ok: true,
-    service: 'vinculo-api',
-    time: new Date().toISOString(),
-  }),
-);
+// Health check com verificação real das dependências (DB e KV).
+app.get('/health', async (c) => {
+  const checks: Record<string, string> = {};
+  try {
+    await c.env.DB.prepare('SELECT 1').first();
+    checks.db = 'ok';
+  } catch {
+    checks.db = 'error';
+  }
+  try {
+    const probe = `health:probe:${Date.now()}`;
+    await c.env.CACHE.put(probe, '1', { expirationTtl: 10 });
+    await c.env.CACHE.delete(probe);
+    checks.kv = 'ok';
+  } catch {
+    checks.kv = 'error';
+  }
+  const ok = Object.values(checks).every((v) => v === 'ok');
+  return c.json({ ok, service: 'vinculo-api', time: new Date().toISOString(), checks }, ok ? 200 : 503);
+});
 
 app.route('/auth', authRoutes);
 app.route('/patients', patientRoutes);

@@ -8,6 +8,7 @@ import { requireAuth, requireRole } from '../middleware/auth';
 import { hashPassword } from '../lib/password';
 import { sendInviteEmail, sendPlanRequestEmail } from '../lib/email';
 import { audit } from '../lib/audit';
+import { rateLimit, clientIp } from '../lib/ratelimit';
 import { PLAN_LIMITS, type PlanKey } from '../lib/plans';
 import type { AppBindings } from '../types';
 
@@ -54,6 +55,9 @@ const inviteSchema = z.object({
 
 teamRoutes.post('/invite', requireAuth, requireRole('owner', 'psychologist'), zValidator('json', inviteSchema), async (c) => {
   const user = c.get('user');
+  // Rate limit: 10 convites por clínica por hora (evita spam de e-mail).
+  const ok = await rateLimit(c.env, `invite:clinic:${user.clinicId}`, 10, 3600);
+  if (!ok) return c.json({ error: 'rate_limit_exceeded' }, 429);
   const { name, email, role } = c.req.valid('json');
   const db = getDb(c.env);
 
@@ -222,13 +226,6 @@ teamRoutes.post('/plan-request', requireAuth, requireRole('owner'), zValidator('
     message: message ?? '',
   });
 
-  await audit(c.env, {
-    clinicId: user.clinicId,
-    actorUserId: user.userId,
-    action: 'plan_change_requested',
-    entity: 'clinic',
-    entityId: user.clinicId,
-    metadata: { from: clinic.plan, to: plan },
-  });
+  await audit(c.env, { clinicId: user.clinicId, actorUserId: user.userId, action: 'plan_request', entity: 'clinic', entityId: user.clinicId, metadata: { plan } });
   return c.json({ ok: true });
 });

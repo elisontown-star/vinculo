@@ -32,23 +32,21 @@ adminRoutes.use('*', requireAuth, requireRole('platform_admin'));
 // --- Visão geral: todas as clínicas com contadores (sem dados de pacientes) --
 adminRoutes.get('/clinics', async (c) => {
   const db = getDb(c.env);
-  const rows = await db.select().from(clinics).all();
 
-  const result = [];
-  for (const clinic of rows) {
-    // Contadores agregados — apenas números, nunca conteúdo.
-    const userCount = await db
-      .select({ n: sql<number>`count(*)` })
-      .from(users)
-      .where(eq(users.clinicId, clinic.id))
-      .get();
-    const patientCount = await db
-      .select({ n: sql<number>`count(*)` })
-      .from(patients)
-      .where(and(eq(patients.clinicId, clinic.id), isNull(patients.deletedAt)))
-      .get();
+  // 3 queries paralelas em vez de 2N+1 (N = número de clínicas).
+  const [rows, userCounts, patientCounts] = await Promise.all([
+    db.select().from(clinics).all(),
+    db.select({ clinicId: users.clinicId, n: sql<number>`count(*)` })
+      .from(users).groupBy(users.clinicId).all(),
+    db.select({ clinicId: patients.clinicId, n: sql<number>`count(*)` })
+      .from(patients).where(isNull(patients.deletedAt)).groupBy(patients.clinicId).all(),
+  ]);
 
-    result.push({
+  const uMap = new Map(userCounts.map((r) => [r.clinicId, r.n]));
+  const pMap = new Map(patientCounts.map((r) => [r.clinicId, r.n]));
+
+  return c.json({
+    clinics: rows.map((clinic) => ({
       id: clinic.id,
       name: clinic.name,
       createdAt: clinic.createdAt,
@@ -57,11 +55,10 @@ adminRoutes.get('/clinics', async (c) => {
       trialEndsAt: clinic.trialEndsAt ?? null,
       plan: clinic.plan ?? 'essencial',
       companyCode: clinic.companyCode ?? null,
-      users: userCount?.n ?? 0,
-      patients: patientCount?.n ?? 0,
-    });
-  }
-  return c.json({ clinics: result });
+      users: uMap.get(clinic.id) ?? 0,
+      patients: pMap.get(clinic.id) ?? 0,
+    })),
+  });
 });
 
 // --- Usuários de uma clínica (metadados apenas, sem senha/segredos) ----------
@@ -328,9 +325,14 @@ adminRoutes.get('/search', async (c) => {
     .limit(30)
     .all();
 
-  // Mapa de nomes de clínica para exibir junto do usuário.
+  // Busca os nomes de clínica apenas para os usuários retornados (JOIN implícito via IN).
+  const clinicIds = [...new Set(userRows.map((u) => u.clinicId))];
   const clinicNames = new Map<string, string>();
-  for (const cl of await db.select().from(clinics).all()) clinicNames.set(cl.id, cl.name);
+  if (clinicIds.length > 0) {
+    const clinicRows2 = await db.select({ id: clinics.id, name: clinics.name })
+      .from(clinics).where(inArray(clinics.id, clinicIds)).all();
+    for (const cl of clinicRows2) clinicNames.set(cl.id, cl.name);
+  }
 
   return c.json({
     users: userRows.map((u) => ({

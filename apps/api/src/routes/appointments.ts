@@ -30,6 +30,9 @@ appointmentRoutes.get('/', requireAuth, clinicRoles, async (c) => {
   const db = getDb(c.env);
   const from = Number(c.req.query('from')) || Date.now() - 7 * 86400000;
   const to = Number(c.req.query('to')) || Date.now() + 30 * 86400000;
+  // Janela máxima de 366 dias para evitar varredura completa da tabela.
+  const MAX_WINDOW_MS = 366 * 86400000;
+  if (to - from > MAX_WINDOW_MS) return c.json({ error: 'range_too_large' }, 400);
   let psychId = c.req.query('psychologistId') || null;
   // O psicólogo enxerga apenas a própria agenda.
   if (u.role === 'psychologist') psychId = u.userId;
@@ -125,7 +128,6 @@ appointmentRoutes.delete('/:id', requireAuth, clinicRoles, async (c) => {
   const db = getDb(c.env);
   const id = c.req.param('id');
   const appt = await db.select({ id: appointments.id }).from(appointments).where(and(eq(appointments.id, id), eq(appointments.clinicId, u.clinicId))).get();
-  if (!appt) return c.json({ error: 'not_found' }, 404);
   await db.delete(appointments).where(eq(appointments.id, id));
   await audit(c.env, { clinicId: u.clinicId, actorUserId: u.userId, action: 'appointment_deleted', entity: 'appointment', entityId: id });
   return c.json({ ok: true });
