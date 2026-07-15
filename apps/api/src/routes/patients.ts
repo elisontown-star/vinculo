@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { and, eq, desc, asc, isNull, isNotNull, inArray, gt, gte, lte, or } from 'drizzle-orm';
+import { and, eq, desc, asc, isNull, isNotNull, inArray, gt, gte, lte, or, sql } from 'drizzle-orm';
 import { getDb } from '../lib/db';
 import { patients, sessions, timelineEvents, clinicalShares, patientFiles, appointments } from '@vinculo/db/schema';
 import { ANA_PERSONA, ANA_FULL_ANALYSIS } from '../lib/anaPrompt';
@@ -149,13 +149,22 @@ patientRoutes.get('/', async (c) => {
   const user = c.get('user');
   const grantors = await activeGrantors(c, user);
   const vis = visibilityFilter(user, grantors);
-  const rows = await getDb(c.env)
-    .select()
-    .from(patients)
-    .where(and(eq(patients.clinicId, user.clinicId), isNull(patients.deletedAt), vis))
-    .orderBy(desc(patients.createdAt))
-    .all();
-  return c.json({ patients: rows.map((p) => serializePatient(p, false)) });
+  const db = getDb(c.env);
+  const limit = Math.min(Math.max(Number(c.req.query('limit') ?? 200), 1), 500);
+  const offset = Math.max(Number(c.req.query('offset') ?? 0), 0);
+  const where = and(eq(patients.clinicId, user.clinicId), isNull(patients.deletedAt), vis);
+
+  const [rows, countRow] = await Promise.all([
+    db.select().from(patients).where(where).orderBy(desc(patients.createdAt)).limit(limit).offset(offset).all(),
+    db.select({ total: sql<number>`count(*)` }).from(patients).where(where).get(),
+  ]);
+
+  return c.json({
+    patients: rows.map((p) => serializePatient(p, false)),
+    total: countRow?.total ?? 0,
+    limit,
+    offset,
+  });
 });
 
 // Lista os pacientes na lixeira (excluídos logicamente).

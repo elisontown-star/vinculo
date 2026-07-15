@@ -313,7 +313,10 @@ export const patientFiles = sqliteTable(
     mime: text('mime'),
     size: integer('size'),
     r2Key: text('r2_key').notNull(),
+    uploadedBy: text('uploaded_by').references(() => users.id),
     createdAt: createdAt(),
   },
-  (t) => [index('patient_files_patient_id_idx').on(t.patientId)],
+  (t) => ({
+    patientIdx: index('patient_files_patient_id_idx').on(t.patientId),
+  }),
 );
