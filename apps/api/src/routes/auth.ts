@@ -557,9 +557,6 @@ authRoutes.get('/google/callback', async (c) => {
 authRoutes.post('/google/exchange', async (c) => {
   const body = await c.req.json().catch(() => ({})) as { code?: string };
   if (!body.code) return c.json({ error: 'missing_code' }, 400);
-  // I2: rate limit por IP — 10 tentativas de OAuth por 15 min.
-  const rl = await rateLimit(c.env, `google:exchange:${clientIp(c.req.raw.headers)}`, 10, 900);
-  if (!rl) return c.json({ error: 'rate_limit_exceeded' }, 429);
   const raw = await c.env.CACHE.get(`goauth_code:${body.code}`);
   if (!raw) return c.json({ error: 'invalid_or_expired_code' }, 400);
   await c.env.CACHE.delete(`goauth_code:${body.code}`);
@@ -578,10 +575,6 @@ const googleCompleteSchema = z.object({
 
 authRoutes.post('/google/complete', zValidator('json', googleCompleteSchema), async (c) => {
   const { pendingKey, clinicName, taxIdType, taxId, plan } = c.req.valid('json');
-
-  // I2: rate limit por IP.
-  const rl = await rateLimit(c.env, `google:complete:${clientIp(c.req.raw.headers)}`, 10, 900);
-  if (!rl) return c.json({ error: 'rate_limit_exceeded' }, 429);
 
   const raw = await c.env.CACHE.get(`gpending:${pendingKey}`);
   if (!raw) return c.json({ error: 'pending_expired' }, 400);
