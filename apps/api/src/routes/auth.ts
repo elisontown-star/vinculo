@@ -453,28 +453,27 @@ authRoutes.get('/google', async (c) => {
 
 // Passo 2: callback do Google — troca code por token e encontra/cria usuário.
 authRoutes.get('/google/callback', async (c) => {
-  // Prefere URL de produção (não-localhost) se houver mais de uma origem configurada.
-  const origins = c.env.WEB_ORIGIN.split(',').map((s) => s.trim());
+  const origins = (c.env.WEB_ORIGIN ?? 'https://vinculoclinico.com.br').split(',').map((s) => s.trim());
   const frontendOrigin = origins.find((o) => !o.includes('localhost')) ?? origins[0];
-  const code = c.req.query('code');
-  const state = c.req.query('state');
-  const error = c.req.query('error');
 
-  if (error || !code || !state) {
-    return c.redirect(`${frontendOrigin}?gerror=cancelled`);
-  }
-
-  // Verifica CSRF state.
-  const stateOk = await c.env.CACHE.get(`goauth_state:${state}`);
-  if (!stateOk) return c.redirect(`${frontendOrigin}?gerror=invalid_state`);
-  await c.env.CACHE.delete(`goauth_state:${state}`);
-
-  // Troca o code por access_token.
-  const origin = new URL(c.req.url).origin;
-  const redirectUri = `${origin}/auth/google/callback`;
-
-  let googleUser: { sub: string; email: string; name: string; picture?: string };
   try {
+    const code = c.req.query('code');
+    const state = c.req.query('state');
+    const error = c.req.query('error');
+
+    if (error || !code || !state) {
+      return c.redirect(`${frontendOrigin}?gerror=cancelled`);
+    }
+
+    // Verifica CSRF state.
+    const stateOk = await c.env.CACHE.get(`goauth_state:${state}`);
+    if (!stateOk) return c.redirect(`${frontendOrigin}?gerror=invalid_state`);
+    await c.env.CACHE.delete(`goauth_state:${state}`);
+
+    // Troca o code por access_token.
+    const origin = new URL(c.req.url).origin;
+    const redirectUri = `${origin}/auth/google/callback`;
+
     const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -487,20 +486,20 @@ authRoutes.get('/google/callback', async (c) => {
       }),
     });
     const tokenData: any = await tokenRes.json();
-    if (!tokenData.access_token) throw new Error('no_access_token');
+    if (!tokenData.access_token) {
+      return c.redirect(`${frontendOrigin}?gerror=no_access_token`);
+    }
 
     const userRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
       headers: { Authorization: `Bearer ${tokenData.access_token}` },
     });
-    googleUser = (await userRes.json()) as any;
-    if (!googleUser.sub || !googleUser.email) throw new Error('missing_fields');
-  } catch {
-    return c.redirect(`${frontendOrigin}?gerror=google_error`);
-  }
+    const googleUser = (await userRes.json()) as { sub: string; email: string; name: string; picture?: string };
+    if (!googleUser.sub || !googleUser.email) {
+      return c.redirect(`${frontendOrigin}?gerror=missing_google_fields`);
+    }
 
-  const db = getDb(c.env);
+    const db = getDb(c.env);
 
-  try {
     // Busca por googleId primeiro.
     let user = await db.select().from(users).where(eq(users.googleId, googleUser.sub)).get();
 
@@ -554,7 +553,7 @@ authRoutes.get('/google/callback', async (c) => {
     return c.redirect(`${frontendOrigin}?gpending=${pendingKey}`);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error('[google/callback] erro interno:', msg);
+    console.error('[google/callback] unhandled error:', msg);
     return c.redirect(`${frontendOrigin}?gerror=${encodeURIComponent(msg)}`);
   }
 });
