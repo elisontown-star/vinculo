@@ -500,57 +500,63 @@ authRoutes.get('/google/callback', async (c) => {
 
   const db = getDb(c.env);
 
-  // Busca por googleId primeiro.
-  let user = await db.select().from(users).where(eq(users.googleId, googleUser.sub)).get();
+  try {
+    // Busca por googleId primeiro.
+    let user = await db.select().from(users).where(eq(users.googleId, googleUser.sub)).get();
 
-  // Senão, busca por e-mail e vincula o googleId.
-  if (!user) {
-    const byEmail = await db.select().from(users).where(eq(users.email, googleUser.email)).get();
-    if (byEmail) {
-      user = await db
-        .update(users)
-        .set({ googleId: googleUser.sub })
-        .where(eq(users.id, byEmail.id))
-        .returning()
-        .get();
-    }
-  }
-
-  if (user) {
-    if (!user.isActive) return c.redirect(`${frontendOrigin}?gerror=account_inactive`);
-
-    if (user.role !== 'platform_admin') {
-      const clinic = await db.select().from(clinics).where(eq(clinics.id, user.clinicId)).get();
-      if (clinic) {
-        const expired = clinic.status === 'trial' && clinic.trialEndsAt != null && Date.now() > clinic.trialEndsAt;
-        if (clinic.status === 'blocked' || !clinic.isActive || expired) {
-          if (expired && clinic.status === 'trial') {
-            await db.update(clinics).set({ status: 'blocked' }).where(eq(clinics.id, clinic.id));
-          }
-          return c.redirect(`${frontendOrigin}?gerror=clinic_blocked`);
-        }
+    // Senão, busca por e-mail e vincula o googleId.
+    if (!user) {
+      const byEmail = await db.select().from(users).where(eq(users.email, googleUser.email)).get();
+      if (byEmail) {
+        user = await db
+          .update(users)
+          .set({ googleId: googleUser.sub })
+          .where(eq(users.id, byEmail.id))
+          .returning()
+          .get();
       }
     }
 
-    // Código de uso único (30s) — evita expor token e dados na URL/histórico.
-    const jwtToken = await issueToken(c.env, user);
-    const oauthCode = randomToken();
-    await c.env.CACHE.put(
-      `goauth_code:${oauthCode}`,
-      JSON.stringify({ token: jwtToken, user: { id: user.id, name: user.name, email: user.email, role: user.role, mfaEnabled: !!user.mfaEnabled } }),
-      { expirationTtl: 30 },
-    );
-    return c.redirect(`${frontendOrigin}?gcode=${oauthCode}`);
-  }
+    if (user) {
+      if (!user.isActive) return c.redirect(`${frontendOrigin}?gerror=account_inactive`);
 
-  // Novo usuário Google — precisa completar o cadastro da clínica.
-  const pendingKey = randomToken();
-  await c.env.CACHE.put(
-    `gpending:${pendingKey}`,
-    JSON.stringify({ googleId: googleUser.sub, email: googleUser.email, name: googleUser.name }),
-    { expirationTtl: GOOGLE_STATE_TTL },
-  );
-  return c.redirect(`${frontendOrigin}?gpending=${pendingKey}`);
+      if (user.role !== 'platform_admin') {
+        const clinic = await db.select().from(clinics).where(eq(clinics.id, user.clinicId)).get();
+        if (clinic) {
+          const expired = clinic.status === 'trial' && clinic.trialEndsAt != null && Date.now() > clinic.trialEndsAt;
+          if (clinic.status === 'blocked' || !clinic.isActive || expired) {
+            if (expired && clinic.status === 'trial') {
+              await db.update(clinics).set({ status: 'blocked' }).where(eq(clinics.id, clinic.id));
+            }
+            return c.redirect(`${frontendOrigin}?gerror=clinic_blocked`);
+          }
+        }
+      }
+
+      // Código de uso único (30s) — evita expor token e dados na URL/histórico.
+      const jwtToken = await issueToken(c.env, user);
+      const oauthCode = randomToken();
+      await c.env.CACHE.put(
+        `goauth_code:${oauthCode}`,
+        JSON.stringify({ token: jwtToken, user: { id: user.id, name: user.name, email: user.email, role: user.role, mfaEnabled: !!user.mfaEnabled } }),
+        { expirationTtl: 30 },
+      );
+      return c.redirect(`${frontendOrigin}?gcode=${oauthCode}`);
+    }
+
+    // Novo usuário Google — precisa completar o cadastro da clínica.
+    const pendingKey = randomToken();
+    await c.env.CACHE.put(
+      `gpending:${pendingKey}`,
+      JSON.stringify({ googleId: googleUser.sub, email: googleUser.email, name: googleUser.name }),
+      { expirationTtl: GOOGLE_STATE_TTL },
+    );
+    return c.redirect(`${frontendOrigin}?gpending=${pendingKey}`);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[google/callback] erro interno:', msg);
+    return c.redirect(`${frontendOrigin}?gerror=${encodeURIComponent(msg)}`);
+  }
 });
 
 // Passo 2b: frontend troca o código de uso único pelo JWT real (código nunca fica na URL).
