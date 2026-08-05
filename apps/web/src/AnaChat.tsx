@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
-import { api } from './lib/api';
-import type { AnaExtractResult } from './lib/api';
+import { api, getUser } from './lib/api';
+import type { AnaExtractResult, AnaAction } from './lib/api';
 import { useI18n } from './i18n';
 import { AnaFace } from './anaAvatar';
 import AnaExtractReview from './AnaExtractReview';
@@ -31,6 +31,8 @@ export default function AnaChat({ patientId }: { patientId?: string }) {
   const [error, setError] = useState('');
   const [lendo, setLendo] = useState(false);
   const [extracao, setExtracao] = useState<AnaExtractResult | null>(null);
+  const [acao, setAcao] = useState<AnaAction | null>(null);
+  const [agendando, setAgendando] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -51,12 +53,43 @@ export default function AnaChat({ patientId }: { patientId?: string }) {
       const history = next.filter((m) => m.content?.trim()).slice(-12);
       const res = await api.anaChat({ patientId, messages: history });
       const reply = res.reply?.trim();
-      if (!reply) throw new Error('empty_reply');
-      setMessages((m) => [...m, { role: 'assistant', content: reply }]);
+      if (!reply && !res.action) throw new Error('empty_reply');
+      if (reply) setMessages((m) => [...m, { role: 'assistant', content: reply }]);
+      setAcao(res.action ?? null);
     } catch {
       setError(t('anaChat.error'));
     } finally {
       setBusy(false);
+    }
+  }
+
+  // Só aqui a consulta entra na agenda de verdade.
+  async function confirmarAgendamento() {
+    if (!acao || agendando) return;
+    setAgendando(true);
+    setError('');
+    try {
+      const me = getUser();
+      if (!me?.id) throw new Error('no_user');
+      await api.appointmentCreate({
+        patientId: acao.patientId,
+        psychologistId: me.id,
+        startsAt: acao.startsAt,
+        endsAt: acao.endsAt,
+        notes: acao.notes || undefined,
+      });
+      const quando = new Date(acao.startsAt).toLocaleString('pt-BR', {
+        day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+      });
+      setAcao(null);
+      setMessages((m) => [
+        ...m,
+        { role: 'assistant', content: `Pronto — ${acao.patientName} está na agenda em ${quando}.` },
+      ]);
+    } catch {
+      setError('Não consegui gravar na agenda. Verifique se o horário está livre.');
+    } finally {
+      setAgendando(false);
     }
   }
 
@@ -128,6 +161,41 @@ export default function AnaChat({ patientId }: { patientId?: string }) {
             ))}
             {busy && <div className="ana-msg assistant ana-typing">{t('anaChat.typing')}</div>}
             {lendo && <div className="ana-msg assistant ana-typing">Lendo o documento…</div>}
+
+            {acao && (
+              <div className="ana-action">
+                <div className="ana-action-head">Confirmar agendamento</div>
+                <dl className="ana-action-fields">
+                  <dt>Paciente</dt>
+                  <dd>{acao.patientName}</dd>
+                  <dt>Data</dt>
+                  <dd>
+                    {new Date(acao.startsAt).toLocaleDateString('pt-BR', {
+                      weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric',
+                    })}
+                  </dd>
+                  <dt>Horário</dt>
+                  <dd>
+                    {new Date(acao.startsAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                    {' · '}{acao.durationMin} min
+                  </dd>
+                  {acao.notes && (
+                    <>
+                      <dt>Observações</dt>
+                      <dd>{acao.notes}</dd>
+                    </>
+                  )}
+                </dl>
+                <div className="ana-action-buttons">
+                  <button className="ghost" onClick={() => setAcao(null)} disabled={agendando}>
+                    Cancelar
+                  </button>
+                  <button className="btn sm" onClick={confirmarAgendamento} disabled={agendando}>
+                    {agendando ? 'Agendando…' : 'Confirmar'}
+                  </button>
+                </div>
+              </div>
+            )}
 
             {extracao && patientId && (
               <AnaExtractReview

@@ -40,6 +40,16 @@ export type AnaProposal = {
   timeline?: AnaTimelineEvent[];
   summary?: string;
 };
+// Ação que a Ana propõe no chat — só vira realidade após confirmação na tela.
+export type AnaAction = {
+  type: 'schedule';
+  patientId: string;
+  patientName: string;
+  startsAt: number;
+  endsAt: number;
+  durationMin: number;
+  notes: string;
+};
 export type AnaExtractResult = {
   fileId: string | null;
   fileName: string;
@@ -334,7 +344,7 @@ export const api = {
 
   anaChat: (
     body: { patientId?: string; messages: { role: 'user' | 'assistant'; content: string }[] },
-  ): Promise<{ reply: string }> =>
+  ): Promise<{ reply: string; action: AnaAction | null }> =>
     req('/patients/ana-chat', { method: 'POST', body: JSON.stringify(body) }),
 
   // --- Ana Luiza: leitura de documento (PDF/Word) e preenchimento assistido ---

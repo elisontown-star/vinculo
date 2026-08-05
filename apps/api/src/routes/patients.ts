@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { and, eq, desc, asc, isNull, isNotNull, inArray, gt, gte, lte, or, sql } from 'drizzle-orm';
 import { getDb } from '../lib/db';
 import { patients, sessions, timelineEvents, clinicalShares, patientFiles, appointments } from '@vinculo/db/schema';
-import { ANA_PERSONA, ANA_FULL_ANALYSIS } from '../lib/anaPrompt';
+import { ANA_PERSONA, ANA_FULL_ANALYSIS, ANA_ACTIONS } from '../lib/anaPrompt';
 import { EXTRACT_SYSTEM, proposalSchema, parseJsonObject, pruneEmpty } from '../lib/anaExtract';
 import { requireAuth } from '../middleware/auth';
 import { audit } from '../lib/audit';
@@ -1206,6 +1206,92 @@ patientRoutes.delete('/:id/permanent', blockSecretary, async (c) => {
   return c.json({ ok: true });
 });
 
+// ---- Ação de agendamento proposta pela Ana ---------------------------------
+// A Ana emite <<<AGENDAR>>>{...}<<<FIM>>> no texto. Aqui o bloco é retirado da
+// resposta, o paciente é resolvido no banco e a proposta volta para a tela.
+// Nada é gravado: quem cria a consulta é POST /appointments, após confirmação.
+type AcaoAgendar = {
+  type: 'schedule';
+  patientId: string;
+  patientName: string;
+  startsAt: number;
+  endsAt: number;
+  durationMin: number;
+  notes: string;
+};
+
+const BLOCO_AGENDAR = /<<<AGENDAR>>>([\s\S]*?)<<<FIM>>>/;
+
+async function extrairAgendamento(
+  c: any,
+  user: AuthUser,
+  resposta: string,
+  patientIdAberto?: string,
+): Promise<{ texto: string; acao: AcaoAgendar | null }> {
+  const m = resposta.match(BLOCO_AGENDAR);
+  // Remove o bloco do texto mesmo se ele estiver malformado — o psicólogo
+  // nunca deve ver a marcação interna.
+  const texto = resposta.replace(/<<<AGENDAR>>>[\s\S]*?(<<<FIM>>>|$)/, '').trim();
+  if (!m) return { texto: resposta.trim(), acao: null };
+
+  let dados: any;
+  try {
+    dados = JSON.parse(m[1].trim());
+  } catch {
+    return { texto, acao: null };
+  }
+
+  const data = String(dados?.data ?? '').trim();
+  const hora = String(dados?.hora ?? '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(data) || !/^\d{2}:\d{2}$/.test(hora)) {
+    return { texto, acao: null };
+  }
+
+  // Brasília é UTC-3 o ano todo (sem horário de verão desde 2019).
+  const inicio = new Date(`${data}T${hora}:00-03:00`);
+  if (isNaN(inicio.getTime())) return { texto, acao: null };
+
+  const duracao = Number.isFinite(dados?.duracao)
+    ? Math.min(Math.max(Number(dados.duracao), 10), 480)
+    : 50;
+
+  // Resolve o paciente: nome citado pela Ana ou o que está aberto na tela.
+  const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+  const nome = norm(String(dados?.paciente ?? ''));
+  const vis = visibilityFilter(user);
+  const lista = await getDb(c.env)
+    .select({ id: patients.id, fullName: patients.fullName })
+    .from(patients)
+    .where(and(eq(patients.clinicId, user.clinicId), isNull(patients.deletedAt), vis))
+    .limit(300)
+    .all();
+
+  let alvo = nome
+    ? lista.find((p) => norm(p.fullName) === nome) ??
+      lista.find((p) => norm(p.fullName).includes(nome) || nome.includes(norm(p.fullName)))
+    : undefined;
+  if (!alvo && patientIdAberto) alvo = lista.find((p) => p.id === patientIdAberto);
+  if (!alvo) {
+    return {
+      texto: `${texto}\n\n(Não localizei esse paciente no cadastro, então não montei a proposta de agendamento.)`.trim(),
+      acao: null,
+    };
+  }
+
+  return {
+    texto,
+    acao: {
+      type: 'schedule',
+      patientId: alvo.id,
+      patientName: alvo.fullName,
+      startsAt: inicio.getTime(),
+      endsAt: inicio.getTime() + duracao * 60000,
+      durationMin: duracao,
+      notes: String(dados?.observacoes ?? '').slice(0, 500),
+    },
+  };
+}
+
 // ---- Chat da Ana Luiza -----------------------------------------------------
 // Conversa com contexto opcional do paciente. Mantém histórico enviado pelo
 // cliente. A IA observa e sugere — nunca diagnostica.
@@ -1293,9 +1379,17 @@ patientRoutes.post('/ana-chat', blockSecretary, zValidator('json', chatSchema), 
     }
   }
 
+  // Data de hoje em Brasília — a Ana precisa disso para resolver "amanhã",
+  // "próxima terça" e afins ao propor um agendamento.
+  const hojeBR = new Date().toLocaleDateString('pt-BR', {
+    timeZone: 'America/Sao_Paulo', weekday: 'long', year: 'numeric', month: '2-digit', day: '2-digit',
+  });
+
   const system =
     ANA_PERSONA +
     '\n\nCONTEXTO DE USO: você está num CHAT com o psicólogo. Responda de forma conversacional, direta e útil, em português. Use os dados do paciente quando a pergunta for sobre ele.' +
+    `\n\nDATA DE HOJE (fuso de Brasília): ${hojeBR}.` +
+    '\n\n' + ANA_ACTIONS +
     patientContext;
 
   let result: string;
@@ -1309,7 +1403,10 @@ patientRoutes.post('/ana-chat', blockSecretary, zValidator('json', chatSchema), 
     return c.json({ error: 'ai_error' }, 500);
   }
 
-  return c.json({ reply: result });
+  // A Ana pode propor um agendamento. O bloco sai do texto e vira um cartão
+  // de confirmação — nada entra na agenda sem o psicólogo clicar.
+  const { texto, acao } = await extrairAgendamento(c, user, result, patientId);
+  return c.json({ reply: texto, action: acao });
   } catch (err: any) {
     console.error('[ana-chat] erro:', err);
     return c.json({ error: 'internal_error' }, 500);
