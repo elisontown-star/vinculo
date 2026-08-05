@@ -664,19 +664,23 @@ function buildPatientContext(patient: any, sess: any[], events: any[]): string {
   if (fam.spouse) famBits.push(`cônjuge/parceiro: ${fam.spouse}`);
   if (famBits.length) parts.push(`Família: ${famBits.join('; ')}.`);
 
-  // Consultas (todas)
+  // Consultas (todas). A mais recente vem marcada — é dela que sai a continuidade.
   if (sess.length) {
     parts.push(`Consultas registradas (${sess.length}, da mais nova para a mais antiga):`);
-    for (const s of sess) {
+    sess.forEach((s, i) => {
       const bits: string[] = [];
       if (s.occurredAt) bits.push(new Date(s.occurredAt).toLocaleDateString('pt-BR'));
       if (s.mood) bits.push(`humor: ${s.mood}`);
       if (typeof s.emotionalScale === 'number') bits.push(`escala: ${s.emotionalScale}/10`);
       if (s.topics?.length) bits.push(`assuntos: ${s.topics.join(', ')}`);
+      if (s.objectives) bits.push(`objetivos da sessão: ${s.objectives}`);
+      if (s.techniques) bits.push(`técnicas aplicadas: ${s.techniques}`);
       if (s.evolution) bits.push(`evolução: ${s.evolution}`);
-      if (s.nextSteps) bits.push(`próximos passos: ${s.nextSteps}`);
-      parts.push(`- ${bits.join('; ') || 'sem detalhes'}`);
-    }
+      if (s.nextSteps) bits.push(`próximos passos combinados: ${s.nextSteps}`);
+      if (s.freeNotes) bits.push(`notas do psicólogo: ${s.freeNotes}`);
+      const marca = i === 0 ? '- [ÚLTIMA CONSULTA] ' : '- ';
+      parts.push(`${marca}${bits.join('; ') || 'sem detalhes'}`);
+    });
   }
 
   // Linha do tempo (completa)
@@ -713,8 +717,9 @@ patientRoutes.get('/:id/ai-questions', requireClinicalAccess, async (c) => {
     .all();
 
   // Cache por paciente + assinatura simples (nº de consultas + data da última).
+  // O sufixo v2 invalida o cache antigo quando o prompt muda.
   const sig = `${sess.length}:${sess[0]?.occurredAt ?? 0}`;
-  const cacheKey = `ai-questions:${id}:${sig}`;
+  const cacheKey = `ai-questions:v2:${id}:${sig}`;
   const cached = await c.env.CACHE.get(cacheKey);
   if (cached) {
     return c.json({ questions: JSON.parse(cached), cached: true });
@@ -728,10 +733,32 @@ patientRoutes.get('/:id/ai-questions', requireClinicalAccess, async (c) => {
   const context = buildPatientContext(patient, sess, eventRows);
   const system =
     ANA_PERSONA +
-    '\n\nTAREFA: a partir das informações do paciente, gere de 10 a 20 perguntas ABERTAS, ' +
-    'empáticas e clinicamente úteis que o psicólogo pode fazer na PRÓXIMA sessão, dando ' +
-    'continuidade ao processo terapêutico. Evite perguntas fechadas (de sim/não). ' +
-    'Cada pergunta em uma linha, começando com "- ". Não escreva mais nada além das perguntas.';
+    `
+
+TAREFA: gere de 10 a 16 perguntas ABERTAS que o psicólogo pode fazer na PRÓXIMA sessão.
+
+REGRA CENTRAL — cada pergunta precisa nascer de um dado CONCRETO do prontuário:
+uma fala registrada, um objetivo terapêutico definido, uma técnica ou tarefa combinada,
+um evento da linha do tempo, uma variação de humor/escala entre consultas, ou algo que
+ficou em aberto nos próximos passos. Se um dado não está nos registros, não invente.
+
+DISTRIBUA as perguntas entre estes ângulos (não rotule, apenas varie):
+1. Continuidade — retoma algo específico dito na última consulta.
+2. Tarefa combinada — investiga o que foi acordado como próximo passo e como foi na prática.
+3. Padrão — conecta dois ou mais momentos diferentes do histórico.
+4. Objetivo terapêutico — mede percepção de avanço no que foi definido como meta.
+5. Recurso e exceção — momentos em que a dificuldade não apareceu, ou o que ajudou.
+6. Contexto de vida — relações, rotina, trabalho, sono, corpo, quando registrados.
+
+CRITÉRIOS DE QUALIDADE:
+- Comece por "Como", "O que", "Quando", "De que forma", "Me conta", "O que mudou".
+- Nada de sim/não, nada de pergunta dupla, nada de sugerir diagnóstico ou conduta.
+- Use os termos que o próprio paciente usou, quando estiverem registrados.
+- Evite fórmulas genéricas do tipo "Como você tem lidado com X desde a última sessão?" —
+  ancore em detalhe: o quê exatamente, quando, com quem, em que situação.
+- Cada pergunta deve ser específica o bastante para não servir a outro paciente.
+
+FORMATO: uma pergunta por linha, começando com "- ". Nada além das perguntas.`;
 
   function parseQuestions(text: string): string[] {
     const out: string[] = [];
@@ -765,8 +792,8 @@ patientRoutes.get('/:id/ai-questions', requireClinicalAccess, async (c) => {
         { role: 'system', content: system },
         { role: 'user', content: context },
       ],
-      max_tokens: 1000,
-      temperature: 0.6,
+      max_tokens: 1200,
+      temperature: 0.7,
     });
     const text: string = (res?.response ?? '').toString().trim();
     console.log('[ana] resposta da IA:', text.slice(0, 200));
@@ -1036,12 +1063,12 @@ patientRoutes.post('/ana-chat', blockSecretary, zValidator('json', chatSchema), 
     const profile = row.profile ? JSON.parse(row.profile) : {};
     const sessRows = await db
       .select().from(sessions)
-      .where(eq(sessions.patientId, row.id))
+      .where(and(eq(sessions.patientId, row.id), eq(sessions.clinicId, user.clinicId)))
       .orderBy(desc(sessions.occurredAt))
       .all();
     const eventRows = await db
       .select().from(timelineEvents)
-      .where(eq(timelineEvents.patientId, row.id))
+      .where(and(eq(timelineEvents.patientId, row.id), eq(timelineEvents.clinicId, user.clinicId)))
       .orderBy(asc(timelineEvents.eventDate))
       .all();
     return buildPatientContext(

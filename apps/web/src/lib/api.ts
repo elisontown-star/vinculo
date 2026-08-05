@@ -300,6 +300,6 @@ export const api = {
 
   anaChat: (
     body: { patientId?: string; messages: { role: 'user' | 'assistant'; content: string }[] },
-  ): Promise<{ answer: string }> =>
+  ): Promise<{ reply: string }> =>
     req('/patients/ana-chat', { method: 'POST', body: JSON.stringify(body) }),
 };

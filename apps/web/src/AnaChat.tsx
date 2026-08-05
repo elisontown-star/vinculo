@@ -27,8 +27,12 @@ export default function AnaChat({ patientId }: { patientId?: string }) {
     setBusy(true);
     setError('');
     try {
-      const res = await api.anaChat({ patientId, messages: next.slice(-12) });
-      setMessages((m) => [...m, { role: 'assistant', content: res.answer }]);
+      // Só envia mensagens com conteúdo — a API rejeita strings vazias.
+      const history = next.filter((m) => m.content?.trim()).slice(-12);
+      const res = await api.anaChat({ patientId, messages: history });
+      const reply = res.reply?.trim();
+      if (!reply) throw new Error('empty_reply');
+      setMessages((m) => [...m, { role: 'assistant', content: reply }]);
     } catch {
       setError(t('anaChat.error'));
     } finally {
