@@ -212,8 +212,8 @@ teamRoutes.post('/plan-request', requireAuth, requireRole('owner'), zValidator('
   if (!clinic) return c.json({ error: 'not_found' }, 404);
   const owner = await db.select().from(users).where(eq(users.id, user.userId)).get();
 
-  // Destinatário fixo do suporte da VTECH IT.
-  const SUPPORT_EMAIL = 'suporte@vtechit.com.br';
+  // Destinatário fixo do suporte da VWORK IT.
+  const SUPPORT_EMAIL = 'suporte@vworkit.com.br';
 
   await sendPlanRequestEmail(c.env, {
     to: [SUPPORT_EMAIL],

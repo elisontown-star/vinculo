@@ -10,9 +10,6 @@ import AdminPanel from './AdminPanel';
 
 // Logo do produto (Vínculo Clínico) — usado na marca do app e na tela de login.
 const VINCULO_LOGO = '/logo-vinculo.png';
-// Logo da VTech IT — usado apenas no selo "desenvolvido por" no rodapé.
-const VTECH_LOGO =
-  'https://vtechit.com.br/wp-content/uploads/2026/05/cropped-Blue-and-Orange-Modern-Letter-V-Technology-Logo.png';
 
 export function Brand({ hideLogo = false }: { hideLogo?: boolean }) {
   const { t } = useI18n();
@@ -80,7 +77,7 @@ function TermsModal({ onClose }: { onClose: () => void }) {
           </div>
 
           <h2>1. Aceitação dos Termos</h2>
-          <p>Estes Termos de Uso regulam o acesso e o uso da plataforma <strong>Vínculo Clínico</strong>, operada pela <strong>VTech IT Solutions</strong>. Ao criar uma conta ou utilizar qualquer funcionalidade da plataforma, o usuário declara ter lido, compreendido e concordado com todos os termos aqui dispostos, bem como com nossa Política de Privacidade.</p>
+          <p>Estes Termos de Uso regulam o acesso e o uso da plataforma <strong>Vínculo Clínico</strong>, operada pela <strong>Vwork IT Solutions</strong>. Ao criar uma conta ou utilizar qualquer funcionalidade da plataforma, o usuário declara ter lido, compreendido e concordado com todos os termos aqui dispostos, bem como com nossa Política de Privacidade.</p>
 
           <h2>2. Descrição do Serviço</h2>
           <p>O Vínculo Clínico é uma plataforma de gestão clínica inteligente voltada a psicólogos e clínicas de saúde mental. Os recursos incluem registro de sessões e prontuários, geração de resumos com inteligência artificial, agenda, gestão de equipes e comunicação com a assistente Ana Luiza.</p>
@@ -100,26 +97,26 @@ function TermsModal({ onClose }: { onClose: () => void }) {
           <p>O usuário compromete-se a utilizar a plataforma exclusivamente para fins lícitos e em conformidade com as normas do Conselho Federal de Psicologia (CFP). É proibido inserir dados de pacientes sem consentimento adequado, utilizar a IA para gerar documentos clínicos que requeiram assinatura de profissional habilitado, ou tentar comprometer a segurança do serviço.</p>
 
           <h2>6. Dados de Saúde e LGPD</h2>
-          <p>O Vínculo Clínico processa <strong>dados pessoais sensíveis</strong> (informações de saúde), conforme a Lei nº 13.709/2018 (LGPD). O usuário (psicólogo ou clínica) atua como <strong>Controlador</strong> dos dados de seus pacientes e é responsável por obter os consentimentos necessários. A VTech IT Solutions atua como <strong>Operadora</strong>, processando os dados exclusivamente para prestação do serviço.</p>
+          <p>O Vínculo Clínico processa <strong>dados pessoais sensíveis</strong> (informações de saúde), conforme a Lei nº 13.709/2018 (LGPD). O usuário (psicólogo ou clínica) atua como <strong>Controlador</strong> dos dados de seus pacientes e é responsável por obter os consentimentos necessários. A Vwork IT Solutions atua como <strong>Operadora</strong>, processando os dados exclusivamente para prestação do serviço.</p>
           <p>Os dados dos pacientes <strong>não serão vendidos, compartilhados ou utilizados para fins publicitários</strong>.</p>
 
           <h2>7. Propriedade Intelectual</h2>
-          <p>Todo o conteúdo da plataforma — incluindo marca, software, layout e a assistente Ana Luiza — é de propriedade exclusiva da VTech IT Solutions. O usuário mantém a titularidade sobre seus dados clínicos e pode exportá-los a qualquer momento. Após encerramento da conta, os dados ficam disponíveis para exportação por até 30 dias.</p>
+          <p>Todo o conteúdo da plataforma — incluindo marca, software, layout e a assistente Ana Luiza — é de propriedade exclusiva da Vwork IT Solutions. O usuário mantém a titularidade sobre seus dados clínicos e pode exportá-los a qualquer momento. Após encerramento da conta, os dados ficam disponíveis para exportação por até 30 dias.</p>
 
           <h2>8. Disponibilidade e Suporte</h2>
-          <p>A VTech empreenderá esforços para manter o serviço disponível 99% do tempo. O suporte é prestado por e-mail em <strong>suporte@vtechit.com.br</strong> e WhatsApp <strong>(11) 92034-8899</strong>, de segunda a sexta, das 9h às 18h (horário de Brasília).</p>
+          <p>A Vwork empreenderá esforços para manter o serviço disponível 99% do tempo. O suporte é prestado por e-mail em <strong>suporte@vworkit.com.br</strong> e WhatsApp <strong>(11) 92034-8899</strong>, de segunda a sexta, das 9h às 18h (horário de Brasília).</p>
 
           <h2>9. Limitação de Responsabilidade</h2>
-          <p>A VTech não se responsabiliza por danos decorrentes de decisões clínicas tomadas com base nas sugestões da IA, interrupções temporárias do serviço por falhas de terceiros, ou perda de dados por ação do próprio usuário. Em qualquer hipótese, a responsabilidade máxima da VTech fica limitada ao valor pago nos últimos 3 meses de assinatura.</p>
+          <p>A Vwork não se responsabiliza por danos decorrentes de decisões clínicas tomadas com base nas sugestões da IA, interrupções temporárias do serviço por falhas de terceiros, ou perda de dados por ação do próprio usuário. Em qualquer hipótese, a responsabilidade máxima da Vwork fica limitada ao valor pago nos últimos 3 meses de assinatura.</p>
 
           <h2>10. Alterações nos Termos</h2>
-          <p>A VTech poderá alterar estes Termos a qualquer momento. Alterações relevantes serão comunicadas com pelo menos 15 dias de antecedência por e-mail ou notificação na plataforma.</p>
+          <p>A Vwork poderá alterar estes Termos a qualquer momento. Alterações relevantes serão comunicadas com pelo menos 15 dias de antecedência por e-mail ou notificação na plataforma.</p>
 
           <h2>11. Rescisão</h2>
-          <p>O usuário pode encerrar sua conta a qualquer momento. A VTech poderá suspender ou encerrar o acesso em caso de violação destes Termos, inadimplência persistente, risco à segurança da plataforma ou determinação legal.</p>
+          <p>O usuário pode encerrar sua conta a qualquer momento. A Vwork poderá suspender ou encerrar o acesso em caso de violação destes Termos, inadimplência persistente, risco à segurança da plataforma ou determinação legal.</p>
 
           <h2>12. Disposições Gerais</h2>
-          <p>Estes Termos são regidos pela legislação brasileira. Fica eleito o foro da Comarca de <strong>São Paulo/SP</strong>. Dúvidas: <strong>juridico@vtechit.com.br</strong></p>
+          <p>Estes Termos são regidos pela legislação brasileira. Fica eleito o foro da Comarca de <strong>São Paulo/SP</strong>. Dúvidas: <strong>juridico@vworkit.com.br</strong></p>
         </div>
       </div>
     </div>
@@ -371,10 +368,10 @@ function Auth({ onDone }: { onDone: () => void }) {
               <div className="blocked-icon">🔒</div>
               <h1>{t('blocked.title')}</h1>
               <p className="sub">{t('blocked.sub')}</p>
-              <a className="btn" href="mailto:suporte@vtechit.com.br?subject=Ativação%20de%20plano%20-%20Vínculo">
+              <a className="btn" href="mailto:suporte@vworkit.com.br?subject=Ativação%20de%20plano%20-%20Vínculo">
                 {t('blocked.contact')}
               </a>
-              <p className="blocked-email">suporte@vtechit.com.br</p>
+              <p className="blocked-email">suporte@vworkit.com.br</p>
               <button className="link-toggle" type="button" onClick={() => { setBlocked(false); setEmail(''); setPassword(''); }}>
                 {t('fp.backToLogin')}
               </button>
@@ -456,11 +453,10 @@ function Auth({ onDone }: { onDone: () => void }) {
         </ul>
         <a
           className="hero-foot-badge"
-          href="https://vtechit.com.br"
+          href="https://www.vworkit.com.br"
           target="_blank"
           rel="noopener noreferrer"
         >
-          <img src={VTECH_LOGO} alt="VTECH IT" className="hero-foot-logo" />
           <span className="hero-foot-text">{t('hero.foot')}</span>
         </a>
       </div>

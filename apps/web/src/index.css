@@ -1,5 +1,5 @@
 /* ======================================================================
-   Vínculo — identidade VTECH IT (azul-marinho + laranja)
+   Vínculo — identidade VWORK IT (azul-marinho + laranja)
    Tipos: Montserrat (interface inteira)
    ====================================================================== */
 :root {
@@ -653,10 +653,10 @@ input, textarea, select, button { font-family: inherit; }
    Tela de login — polimento profissional + animações
    ====================================================================== */
 
-/* Selo "Uma solução VTECH IT" em destaque */
+/* Selo "Uma solução VWORK IT" em destaque */
 .hero-foot-badge {
   display: inline-flex; align-items: center; gap: 10px;
-  padding: 9px 16px 9px 10px; border-radius: 999px;
+  padding: 9px 18px; border-radius: 999px;
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.16);
   backdrop-filter: blur(4px); width: fit-content;
@@ -676,8 +676,8 @@ input, textarea, select, button { font-family: inherit; }
 }
 
 /* Brilho pulsante suave ao redor do selo */
-.hero-foot-badge { animation: vtech-glow 3.5s ease-in-out infinite; }
-@keyframes vtech-glow {
+.hero-foot-badge { animation: vwork-glow 3.5s ease-in-out infinite; }
+@keyframes vwork-glow {
   0%, 100% { box-shadow: 0 4px 16px rgba(0,0,0,0.15), 0 0 0 0 rgba(245,130,31,0); }
   50%      { box-shadow: 0 4px 16px rgba(0,0,0,0.15), 0 0 18px 2px rgba(245,130,31,0.35); }
 }
@@ -690,7 +690,7 @@ input, textarea, select, button { font-family: inherit; }
 .hero-points li:nth-child(1) { animation-delay: 0.30s; }
 .hero-points li:nth-child(2) { animation-delay: 0.42s; }
 .hero-points li:nth-child(3) { animation-delay: 0.54s; }
-.hero-foot-badge { animation: fade-up 0.7s ease 0.66s both, vtech-glow 3.5s ease-in-out 1s infinite; }
+.hero-foot-badge { animation: fade-up 0.7s ease 0.66s both, vwork-glow 3.5s ease-in-out 1s infinite; }
 
 /* Card do formulário entra suavemente */
 .auth-panel .auth-card { animation: fade-in-scale 0.6s ease 0.15s both; }
@@ -783,7 +783,7 @@ input, textarea, select, button { font-family: inherit; }
   .hero-title { font-size: 24px; }
 }
 
-/* Selo VTECH agora é link clicável */
+/* Selo VWORK agora é link clicável */
 a.hero-foot-badge { text-decoration: none; cursor: pointer; transition: transform 0.15s ease, background 0.15s ease; }
 a.hero-foot-badge:hover { transform: translateY(-1px); background: rgba(255, 255, 255, 0.13); }
 
