@@ -8,8 +8,7 @@ import { AcceptInvite } from './AcceptInvite';
 import Workspace from './Workspace';
 import AdminPanel from './AdminPanel';
 
-const VTECH_LOGO =
-  'https://vtechit.com.br/wp-content/uploads/2026/05/cropped-Blue-and-Orange-Modern-Letter-V-Technology-Logo.png';
+const VTECH_LOGO = '/logo-vinculo.png';
 
 export function Brand({ hideLogo = false }: { hideLogo?: boolean }) {
   const { t } = useI18n();
