@@ -10,20 +10,18 @@ import AdminPanel from './AdminPanel';
 
 // Logo do produto (Vínculo Clínico) — usado na marca do app e na tela de login.
 const VINCULO_LOGO = '/logo-vinculo.png';
+// Variante clara: o logo original é azul-marinho e sumiria sobre o fundo navy.
+const VINCULO_LOGO_LIGHT = '/logo-vinculo-light.png';
 
 export function Brand({ hideLogo = false }: { hideLogo?: boolean }) {
   const { t } = useI18n();
   return (
     <div className={`brand ${hideLogo ? 'brand-nologo' : ''}`}>
       {!hideLogo && (
-        <img
-          className="brand-logo"
-          src={VINCULO_LOGO}
-          alt="Vínculo Clínico"
-          onError={(e) => {
-            (e.currentTarget as HTMLImageElement).style.display = 'none';
-          }}
-        />
+        <>
+          <img className="brand-logo brand-logo-dark" src={VINCULO_LOGO} alt="Vínculo Clínico" />
+          <img className="brand-logo brand-logo-light" src={VINCULO_LOGO_LIGHT} alt="" aria-hidden="true" />
+        </>
       )}
       <div className="brand-text">
         <span className="word"><span className="word-v">V</span>ínculo</span>

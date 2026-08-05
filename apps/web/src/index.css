@@ -37,7 +37,9 @@ input, textarea, select, button { font-family: inherit; }
 /* Marca */
 .brand { display: inline-flex; align-items: center; gap: 11px; }
 /* Logo em lockup (símbolo + palavra): altura fixa, largura proporcional. */
-.brand-logo { height: 34px; width: auto; object-fit: contain; flex: none; }
+.brand-logo { height: 36px; width: auto; object-fit: contain; flex: none; }
+/* Sobre fundo claro usa a versão azul; sobre o navy, a versão branca. */
+.brand-logo-light { display: none; }
 /* O logo já traz a palavra "Vínculo Clínico" — evita repetir no texto ao lado. */
 .brand:not(.brand-nologo) .word { display: none; }
 .brand-text { display: flex; flex-direction: column; line-height: 1.05; }
@@ -57,9 +59,11 @@ input, textarea, select, button { font-family: inherit; }
 .auth-wrap { min-height: 100%; display: grid; grid-template-columns: 1.05fr 1fr; }
 .auth-hero { position: relative; overflow: hidden; background: radial-gradient(1000px 500px at 15% 0%, rgba(245, 130, 31, 0.22), transparent 55%), linear-gradient(160deg, var(--navy) 0%, var(--navy-deep) 100%); color: #fff; padding: 56px 60px; display: flex; flex-direction: column; justify-content: center; }
 .auth-hero::after { content: ''; position: absolute; right: -120px; bottom: -120px; width: 360px; height: 360px; border-radius: 50%; background: radial-gradient(circle, rgba(245, 130, 31, 0.18), transparent 70%); }
-/* Na tela de login o logo aparece maior, com a assinatura logo abaixo. */
-.auth-hero .brand { margin-bottom: 40px; flex-direction: column; align-items: flex-start; gap: 12px; }
-.auth-hero .brand-logo { height: 64px; width: auto; background: none; padding: 0; }
+/* Na tela de login o logo aparece grande, com a assinatura logo abaixo. */
+.auth-hero .brand { margin-bottom: 40px; flex-direction: column; align-items: flex-start; gap: 14px; }
+.auth-hero .brand-logo { height: 92px; width: auto; background: none; padding: 0; }
+.auth-hero .brand-logo-dark { display: none; }
+.auth-hero .brand-logo-light { display: block; }
 .auth-hero .brand .word { color: #fff; font-size: 24px; }
 .auth-hero .brand .tag { color: rgba(255, 255, 255, 0.72); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; }
 .hero-title { font-family: 'Montserrat', system-ui, sans-serif; font-weight: 600; font-size: 32px; line-height: 1.18; letter-spacing: -0.02em; margin: 0 0 16px; max-width: 15ch; }
