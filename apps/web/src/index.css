@@ -57,18 +57,20 @@ input, textarea, select, button { font-family: inherit; }
 
 /* Autenticação (tela dividida) */
 .auth-wrap { min-height: 100%; display: grid; grid-template-columns: 1.05fr 1fr; }
-.auth-hero { position: relative; overflow: hidden; background: radial-gradient(1000px 500px at 15% 0%, rgba(245, 130, 31, 0.22), transparent 55%), linear-gradient(160deg, var(--navy) 0%, var(--navy-deep) 100%); color: #fff; padding: 56px 60px; display: flex; flex-direction: column; justify-content: center; }
+.auth-hero { position: relative; overflow: hidden; background: radial-gradient(1000px 500px at 15% 0%, rgba(245, 130, 31, 0.22), transparent 55%), linear-gradient(160deg, var(--navy) 0%, var(--navy-deep) 100%); color: #fff; padding: 56px 60px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+/* O bloco fica centralizado, mas os itens da lista mantêm o alinhamento à esquerda. */
+.auth-hero > * { max-width: 440px; width: 100%; }
 .auth-hero::after { content: ''; position: absolute; right: -120px; bottom: -120px; width: 360px; height: 360px; border-radius: 50%; background: radial-gradient(circle, rgba(245, 130, 31, 0.18), transparent 70%); }
 /* Na tela de login o logo aparece grande, com a assinatura logo abaixo. */
-.auth-hero .brand { margin-bottom: 40px; flex-direction: column; align-items: flex-start; gap: 14px; }
-.auth-hero .brand-logo { height: 92px; width: auto; background: none; padding: 0; }
+.auth-hero .brand { margin-bottom: 40px; flex-direction: column; align-items: center; gap: 14px; }
+.auth-hero .brand-logo { height: 106px; width: auto; background: none; padding: 0; }
 .auth-hero .brand-logo-dark { display: none; }
 .auth-hero .brand-logo-light { display: block; }
 .auth-hero .brand .word { color: #fff; font-size: 24px; }
 .auth-hero .brand .tag { color: rgba(255, 255, 255, 0.72); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; }
-.hero-title { font-family: 'Montserrat', system-ui, sans-serif; font-weight: 600; font-size: 32px; line-height: 1.18; letter-spacing: -0.02em; margin: 0 0 16px; max-width: 15ch; }
-.hero-sub { font-size: 15px; line-height: 1.6; color: rgba(255, 255, 255, 0.78); margin: 0 0 26px; max-width: 42ch; }
-.hero-points { list-style: none; padding: 0; margin: 0 0 34px; display: flex; flex-direction: column; gap: 12px; }
+.hero-title { font-family: 'Montserrat', system-ui, sans-serif; font-weight: 600; font-size: 32px; line-height: 1.18; letter-spacing: -0.02em; margin: 0 auto 16px; max-width: 15ch; }
+.hero-sub { font-size: 15px; line-height: 1.6; color: rgba(255, 255, 255, 0.78); margin: 0 auto 26px; max-width: 42ch; }
+.hero-points { list-style: none; padding: 0; margin: 0 auto 34px; display: flex; flex-direction: column; gap: 12px; width: fit-content; text-align: left; }
 .hero-points li { position: relative; padding-left: 28px; font-size: 14.5px; color: rgba(255, 255, 255, 0.92); }
 .hero-points li::before { content: '✓'; position: absolute; left: 0; top: -1px; width: 19px; height: 19px; border-radius: 50%; background: var(--orange); color: #fff; font-size: 11px; font-weight: 700; display: grid; place-items: center; }
 .hero-foot { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255, 255, 255, 0.6); }
@@ -664,6 +666,7 @@ input, textarea, select, button { font-family: inherit; }
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.16);
   backdrop-filter: blur(4px); width: fit-content;
+  margin: 0 auto;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
 }
 .hero-foot-logo {
