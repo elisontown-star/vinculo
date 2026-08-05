@@ -4,6 +4,8 @@ import type { Env } from '../types';
 // Ajuste para o seu domínio verificado (ex: 'Vínculo <nao-responda@seu-dominio.com>').
 const FROM = 'Vínculo <nao-responda@vinculoclinico.com.br>';
 const APP_URL = 'https://vinculoclinico.com.br';
+// Logo servido pelo próprio site — clientes de e-mail exigem URL absoluta.
+const LOGO_URL = `${APP_URL}/logo-vinculo.png`;
 
 export async function sendInviteEmail(env: Env, to: string, name: string, clinicName: string, token: string): Promise<void> {
   const link = `${APP_URL}/?invite=${token}`;
@@ -158,23 +160,80 @@ export async function sendAppointmentReminderEmail(
     timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit',
   });
 
+  // Tabelas em vez de flex/grid: é o que os clientes de e-mail renderizam bem.
   const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
-      <h2 style="color:#1a2960; margin:0 0 8px;">Sua consulta está agendada</h2>
-      <p style="color:#444; font-size:14px; line-height:1.5;">
-        Olá, ${opts.patientName}! Confirmamos o seu atendimento com
-        <b>${opts.psychologistName}</b>.
-      </p>
-      <div style="background:#f4f6fb; border-radius:10px; padding:16px; margin:18px 0;">
-        <p style="margin:0 0 6px; color:#1a2960; font-size:15px;"><b>${data}</b></p>
-        <p style="margin:0; color:#444; font-size:14px;">às ${hora} · ${opts.durationMin} minutos</p>
-      </div>
-      ${opts.notes ? `<p style="color:#444; font-size:14px; line-height:1.5;">${opts.notes}</p>` : ''}
-      <p style="color:#888; font-size:12.5px; line-height:1.5;">
-        Se precisar remarcar ou cancelar, entre em contato com a clínica
-        <b>${opts.clinicName}</b>. Este é um e-mail automático — não responda.
-      </p>
-    </div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+           style="background:#eef1f7; margin:0; padding:28px 12px; font-family:Arial, Helvetica, sans-serif;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+                 style="max-width:520px; background:#ffffff; border-radius:14px; overflow:hidden;
+                        box-shadow:0 2px 10px rgba(26,41,96,0.08);">
+
+            <!-- Cabeçalho com a marca -->
+            <tr>
+              <td align="center" style="padding:26px 24px 18px; border-bottom:1px solid #e8ecf4;">
+                <img src="${LOGO_URL}" alt="Vínculo Clínico" width="190"
+                     style="display:block; width:190px; max-width:70%; height:auto; border:0;" />
+              </td>
+            </tr>
+
+            <!-- Conteúdo -->
+            <tr>
+              <td style="padding:26px 28px 8px;">
+                <h1 style="color:#1a2960; font-size:20px; margin:0 0 10px; font-weight:bold;">
+                  Sua consulta está agendada
+                </h1>
+                <p style="color:#444; font-size:14.5px; line-height:1.6; margin:0;">
+                  Olá, ${opts.patientName}! Confirmamos o seu atendimento com
+                  <b>${opts.psychologistName}</b>.
+                </p>
+              </td>
+            </tr>
+
+            <!-- Bloco de data e hora -->
+            <tr>
+              <td style="padding:18px 28px 4px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+                       style="background:#f4f6fb; border-left:4px solid #f5821f; border-radius:10px;">
+                  <tr>
+                    <td style="padding:16px 18px;">
+                      <p style="margin:0 0 6px; color:#1a2960; font-size:16px; font-weight:bold;
+                                text-transform:capitalize;">${data}</p>
+                      <p style="margin:0; color:#444; font-size:14.5px;">
+                        às ${hora} · ${opts.durationMin} minutos
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            ${opts.notes ? `
+            <tr>
+              <td style="padding:14px 28px 0;">
+                <p style="color:#444; font-size:14px; line-height:1.6; margin:0;">${opts.notes}</p>
+              </td>
+            </tr>` : ''}
+
+            <!-- Rodapé -->
+            <tr>
+              <td style="padding:20px 28px 26px;">
+                <p style="color:#888; font-size:12.5px; line-height:1.6; margin:0;">
+                  Se precisar remarcar ou cancelar, entre em contato com a clínica
+                  <b style="color:#666;">${opts.clinicName}</b>.<br />
+                  Este é um e-mail automático — não responda.
+                </p>
+              </td>
+            </tr>
+          </table>
+
+          <p style="color:#9aa3b8; font-size:11px; margin:14px 0 0; font-family:Arial, Helvetica, sans-serif;">
+            Vínculo Clínico · Memória Clínica Inteligente
+          </p>
+        </td>
+      </tr>
+    </table>
   `;
 
   const res = await fetch('https://api.resend.com/emails', {
