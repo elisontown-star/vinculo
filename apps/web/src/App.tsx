@@ -8,7 +8,11 @@ import { AcceptInvite } from './AcceptInvite';
 import Workspace from './Workspace';
 import AdminPanel from './AdminPanel';
 
-const VTECH_LOGO = '/logo-vinculo.png';
+// Logo do produto (Vínculo Clínico) — usado na marca do app e na tela de login.
+const VINCULO_LOGO = '/logo-vinculo.png';
+// Logo da VTech IT — usado apenas no selo "desenvolvido por" no rodapé.
+const VTECH_LOGO =
+  'https://vtechit.com.br/wp-content/uploads/2026/05/cropped-Blue-and-Orange-Modern-Letter-V-Technology-Logo.png';
 
 export function Brand({ hideLogo = false }: { hideLogo?: boolean }) {
   const { t } = useI18n();
@@ -17,8 +21,8 @@ export function Brand({ hideLogo = false }: { hideLogo?: boolean }) {
       {!hideLogo && (
         <img
           className="brand-logo"
-          src={VTECH_LOGO}
-          alt="Vtech IT"
+          src={VINCULO_LOGO}
+          alt="Vínculo Clínico"
           onError={(e) => {
             (e.currentTarget as HTMLImageElement).style.display = 'none';
           }}
@@ -442,7 +446,7 @@ function Auth({ onDone }: { onDone: () => void }) {
       </div>
 
       <div className="auth-hero">
-        <Brand hideLogo />
+        <Brand />
         <h2 className="hero-title">{t('hero.title')}</h2>
         <p className="hero-sub">{t('hero.sub')}</p>
         <ul className="hero-points">
