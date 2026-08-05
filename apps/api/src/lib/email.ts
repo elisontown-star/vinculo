@@ -136,3 +136,59 @@ export async function sendPlanRequestEmail(
     throw new Error(`resend_failed: ${res.status} ${body.slice(0, 200)}`);
   }
 }
+
+// Lembrete de consulta enviado ao paciente no momento do agendamento.
+export async function sendAppointmentReminderEmail(
+  env: Env,
+  opts: {
+    to: string;
+    patientName: string;
+    clinicName: string;
+    psychologistName: string;
+    startsAt: number;
+    durationMin: number;
+    notes?: string;
+  },
+): Promise<void> {
+  const d = new Date(opts.startsAt);
+  const data = d.toLocaleDateString('pt-BR', {
+    timeZone: 'America/Sao_Paulo', weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
+  });
+  const hora = d.toLocaleTimeString('pt-BR', {
+    timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit',
+  });
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
+      <h2 style="color:#1a2960; margin:0 0 8px;">Sua consulta está agendada</h2>
+      <p style="color:#444; font-size:14px; line-height:1.5;">
+        Olá, ${opts.patientName}! Confirmamos o seu atendimento com
+        <b>${opts.psychologistName}</b>.
+      </p>
+      <div style="background:#f4f6fb; border-radius:10px; padding:16px; margin:18px 0;">
+        <p style="margin:0 0 6px; color:#1a2960; font-size:15px;"><b>${data}</b></p>
+        <p style="margin:0; color:#444; font-size:14px;">às ${hora} · ${opts.durationMin} minutos</p>
+      </div>
+      ${opts.notes ? `<p style="color:#444; font-size:14px; line-height:1.5;">${opts.notes}</p>` : ''}
+      <p style="color:#888; font-size:12.5px; line-height:1.5;">
+        Se precisar remarcar ou cancelar, entre em contato com a clínica
+        <b>${opts.clinicName}</b>. Este é um e-mail automático — não responda.
+      </p>
+    </div>
+  `;
+
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      from: FROM,
+      to: [opts.to],
+      subject: `Consulta agendada — ${data} às ${hora}`,
+      html,
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`resend_failed: ${res.status} ${body.slice(0, 200)}`);
+  }
+}

@@ -45,10 +45,12 @@ export type AnaAction = {
   type: 'schedule';
   patientId: string;
   patientName: string;
+  patientEmail: string | null;
   startsAt: number;
   endsAt: number;
   durationMin: number;
   notes: string;
+  conflicts: { patientName: string | null; startsAt: number; endsAt: number }[];
 };
 export type AnaExtractResult = {
   fileId: string | null;
@@ -291,8 +293,10 @@ export const api = {
     req('/appointments/psychologists'),
   appointmentsList: (from: number, to: number, psychologistId?: string): Promise<{ appointments: Appointment[] }> =>
     req(`/appointments?from=${from}&to=${to}${psychologistId ? `&psychologistId=${psychologistId}` : ''}`),
-  appointmentCreate: (b: { patientId: string; psychologistId: string; startsAt: number; endsAt: number; notes?: string }): Promise<{ ok: boolean; id: string }> =>
+  appointmentCreate: (b: { patientId: string; psychologistId: string; startsAt: number; endsAt: number; notes?: string; notifyPatient?: boolean }): Promise<{ ok: boolean; id: string; emailSent: boolean | null }> =>
     req('/appointments', { method: 'POST', body: JSON.stringify(b) }),
+  appointmentsDay: (date: string, psychologistId?: string): Promise<{ date: string; psychologistId: string; appointments: { id: string; startsAt: number; endsAt: number; patientName: string | null; status: string }[] }> =>
+    req(`/appointments/day?date=${date}${psychologistId ? `&psychologistId=${psychologistId}` : ''}`),
   appointmentUpdate: (id: string, b: { startsAt?: number; endsAt?: number; status?: string; notes?: string }): Promise<{ ok: boolean }> =>
     req(`/appointments/${id}`, { method: 'PATCH', body: JSON.stringify(b) }),
   appointmentDelete: (id: string): Promise<{ ok: boolean }> =>

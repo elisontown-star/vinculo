@@ -33,6 +33,7 @@ export default function AnaChat({ patientId }: { patientId?: string }) {
   const [extracao, setExtracao] = useState<AnaExtractResult | null>(null);
   const [acao, setAcao] = useState<AnaAction | null>(null);
   const [agendando, setAgendando] = useState(false);
+  const [avisarPaciente, setAvisarPaciente] = useState(true);
   const bodyRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -71,20 +72,28 @@ export default function AnaChat({ patientId }: { patientId?: string }) {
     try {
       const me = getUser();
       if (!me?.id) throw new Error('no_user');
-      await api.appointmentCreate({
+      const enviarEmail = avisarPaciente && !!acao.patientEmail;
+      const res = await api.appointmentCreate({
         patientId: acao.patientId,
         psychologistId: me.id,
         startsAt: acao.startsAt,
         endsAt: acao.endsAt,
         notes: acao.notes || undefined,
+        notifyPatient: enviarEmail,
       });
       const quando = new Date(acao.startsAt).toLocaleString('pt-BR', {
         day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
       });
+      let aviso = '';
+      if (enviarEmail) {
+        aviso = res.emailSent
+          ? ` Enviei o lembrete para ${acao.patientEmail}.`
+          : ' Só não consegui enviar o e-mail de lembrete.';
+      }
       setAcao(null);
       setMessages((m) => [
         ...m,
-        { role: 'assistant', content: `Pronto — ${acao.patientName} está na agenda em ${quando}.` },
+        { role: 'assistant', content: `Pronto — ${acao.patientName} está na agenda em ${quando}.${aviso}` },
       ]);
     } catch {
       setError('Não consegui gravar na agenda. Verifique se o horário está livre.');
@@ -186,6 +195,37 @@ export default function AnaChat({ patientId }: { patientId?: string }) {
                     </>
                   )}
                 </dl>
+
+                {acao.conflicts.length > 0 && (
+                  <div className="ana-action-conflict">
+                    <strong>⚠ Esse horário já está ocupado</strong>
+                    <ul>
+                      {acao.conflicts.map((k, i) => (
+                        <li key={i}>
+                          {new Date(k.startsAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                          –{new Date(k.endsAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                          {' · '}{k.patientName ?? 'paciente'}
+                        </li>
+                      ))}
+                    </ul>
+                    <span>Você pode confirmar mesmo assim, se for intencional.</span>
+                  </div>
+                )}
+
+                <label className="ana-action-email">
+                  <input
+                    type="checkbox"
+                    checked={avisarPaciente && !!acao.patientEmail}
+                    disabled={!acao.patientEmail}
+                    onChange={(e) => setAvisarPaciente(e.target.checked)}
+                  />
+                  <span>
+                    {acao.patientEmail
+                      ? `Enviar lembrete por e-mail para ${acao.patientEmail}`
+                      : 'Paciente sem e-mail cadastrado — não dá para enviar lembrete'}
+                  </span>
+                </label>
+
                 <div className="ana-action-buttons">
                   <button className="ghost" onClick={() => setAcao(null)} disabled={agendando}>
                     Cancelar

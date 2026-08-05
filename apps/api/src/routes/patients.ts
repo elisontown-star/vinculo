@@ -1214,11 +1214,58 @@ type AcaoAgendar = {
   type: 'schedule';
   patientId: string;
   patientName: string;
+  patientEmail: string | null;
   startsAt: number;
   endsAt: number;
   durationMin: number;
   notes: string;
+  // Consultas do psicólogo que colidem com o horário proposto.
+  conflicts: { patientName: string | null; startsAt: number; endsAt: number }[];
 };
+
+// Agenda das próximas semanas, em texto, para a Ana responder perguntas como
+// "quais horários eu tenho no dia 8?" sem precisar de uma segunda chamada.
+async function agendaResumo(c: any, user: AuthUser): Promise<string> {
+  const agora = Date.now();
+  const ate = agora + 45 * 86400000;
+  const rows = await getDb(c.env)
+    .select({
+      startsAt: appointments.startsAt,
+      endsAt: appointments.endsAt,
+      status: appointments.status,
+      patientName: patients.fullName,
+    })
+    .from(appointments)
+    .leftJoin(patients, eq(patients.id, appointments.patientId))
+    .where(and(
+      eq(appointments.clinicId, user.clinicId),
+      eq(appointments.psychologistId, user.userId),
+      gte(appointments.startsAt, new Date(agora - 86400000)),
+      lte(appointments.startsAt, new Date(ate)),
+    ))
+    .all();
+
+  const ms = (v: unknown) => (v instanceof Date ? v.getTime() : Number(v));
+  const ativos = rows.filter((r) => r.status !== 'canceled').sort((a, b) => ms(a.startsAt) - ms(b.startsAt));
+  if (!ativos.length) {
+    return '\n\nAGENDA DO PSICÓLOGO (próximos 45 dias): nenhuma consulta marcada.';
+  }
+
+  const linhas = ativos.slice(0, 80).map((r) => {
+    const d = new Date(ms(r.startsAt));
+    const dia = d.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'short', day: '2-digit', month: '2-digit' });
+    const hi = d.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' });
+    const hf = new Date(ms(r.endsAt)).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' });
+    return `- ${dia} ${hi}–${hf} · ${r.patientName ?? 'paciente'}`;
+  });
+
+  return (
+    '\n\nAGENDA DO PSICÓLOGO (próximos 45 dias, fuso de Brasília) — use para responder ' +
+    'sobre disponibilidade. O expediente padrão é de segunda a sexta, das 8h às 19h; ' +
+    'considere livre todo horário do expediente que não estiver nesta lista:\n' +
+    linhas.join('\n')
+  );
+}
 
 const BLOCO_AGENDAR = /<<<AGENDAR>>>([\s\S]*?)<<<FIM>>>/;
 
@@ -1260,7 +1307,7 @@ async function extrairAgendamento(
   const nome = norm(String(dados?.paciente ?? ''));
   const vis = visibilityFilter(user);
   const lista = await getDb(c.env)
-    .select({ id: patients.id, fullName: patients.fullName })
+    .select({ id: patients.id, fullName: patients.fullName, email: patients.email })
     .from(patients)
     .where(and(eq(patients.clinicId, user.clinicId), isNull(patients.deletedAt), vis))
     .limit(300)
@@ -1278,16 +1325,44 @@ async function extrairAgendamento(
     };
   }
 
+  const inicioMs = inicio.getTime();
+  const fimMs = inicioMs + duracao * 60000;
+
+  // Choque de horário: qualquer consulta ativa do psicólogo que se sobreponha.
+  const doDia = await getDb(c.env)
+    .select({
+      startsAt: appointments.startsAt,
+      endsAt: appointments.endsAt,
+      status: appointments.status,
+      patientName: patients.fullName,
+    })
+    .from(appointments)
+    .leftJoin(patients, eq(patients.id, appointments.patientId))
+    .where(and(
+      eq(appointments.clinicId, user.clinicId),
+      eq(appointments.psychologistId, user.userId),
+      gte(appointments.startsAt, new Date(inicioMs - 12 * 3600000)),
+      lte(appointments.startsAt, new Date(fimMs + 12 * 3600000)),
+    ))
+    .all();
+
+  const ms = (v: unknown) => (v instanceof Date ? v.getTime() : Number(v));
+  const conflicts = doDia
+    .filter((r) => r.status !== 'canceled' && ms(r.startsAt) < fimMs && ms(r.endsAt) > inicioMs)
+    .map((r) => ({ patientName: r.patientName, startsAt: ms(r.startsAt), endsAt: ms(r.endsAt) }));
+
   return {
     texto,
     acao: {
       type: 'schedule',
       patientId: alvo.id,
       patientName: alvo.fullName,
-      startsAt: inicio.getTime(),
-      endsAt: inicio.getTime() + duracao * 60000,
+      patientEmail: alvo.email ?? null,
+      startsAt: inicioMs,
+      endsAt: fimMs,
       durationMin: duracao,
       notes: String(dados?.observacoes ?? '').slice(0, 500),
+      conflicts,
     },
   };
 }
@@ -1389,6 +1464,7 @@ patientRoutes.post('/ana-chat', blockSecretary, zValidator('json', chatSchema), 
     ANA_PERSONA +
     '\n\nCONTEXTO DE USO: você está num CHAT com o psicólogo. Responda de forma conversacional, direta e útil, em português. Use os dados do paciente quando a pergunta for sobre ele.' +
     `\n\nDATA DE HOJE (fuso de Brasília): ${hojeBR}.` +
+    (await agendaResumo(c, user)) +
     '\n\n' + ANA_ACTIONS +
     patientContext;
 
