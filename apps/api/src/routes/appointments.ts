@@ -132,6 +132,57 @@ appointmentRoutes.post('/', requireAuth, clinicRoles, zValidator('json', createS
   return c.json({ ok: true, id: appt.id, emailSent });
 });
 
+// Envia (ou reenvia) o lembrete por e-mail de uma consulta já marcada.
+appointmentRoutes.post('/:id/remind', requireAuth, clinicRoles, async (c) => {
+  const u = c.get('user');
+  const db = getDb(c.env);
+  const id = c.req.param('id');
+
+  const appt = await db
+    .select({
+      id: appointments.id,
+      startsAt: appointments.startsAt,
+      endsAt: appointments.endsAt,
+      status: appointments.status,
+      notes: appointments.notes,
+      psychologistId: appointments.psychologistId,
+      patientName: patients.fullName,
+      patientSocial: patients.socialName,
+      patientEmail: patients.email,
+    })
+    .from(appointments)
+    .leftJoin(patients, eq(patients.id, appointments.patientId))
+    .where(and(eq(appointments.id, id), eq(appointments.clinicId, u.clinicId)))
+    .get();
+  if (!appt) return c.json({ error: 'not_found' }, 404);
+  if (!appt.patientEmail) return c.json({ error: 'patient_without_email' }, 422);
+  if (appt.status === 'canceled') return c.json({ error: 'appointment_canceled' }, 409);
+
+  const psy = appt.psychologistId
+    ? await db.select({ name: users.name }).from(users).where(eq(users.id, appt.psychologistId)).get()
+    : null;
+  const clinic = await db.select({ name: clinics.name }).from(clinics).where(eq(clinics.id, u.clinicId)).get();
+
+  const ms = (v: unknown) => (v instanceof Date ? v.getTime() : Number(v));
+  try {
+    await sendAppointmentReminderEmail(c.env, {
+      to: appt.patientEmail,
+      patientName: appt.patientSocial || appt.patientName || 'paciente',
+      clinicName: clinic?.name ?? 'sua clínica',
+      psychologistName: psy?.name ?? 'seu psicólogo',
+      startsAt: ms(appt.startsAt),
+      durationMin: Math.round((ms(appt.endsAt) - ms(appt.startsAt)) / 60000),
+      notes: appt.notes || undefined,
+    });
+  } catch (err) {
+    console.error('[appointments] reenvio de lembrete falhou:', err instanceof Error ? err.message : String(err));
+    return c.json({ error: 'email_failed' }, 502);
+  }
+
+  await audit(c.env, { clinicId: u.clinicId, actorUserId: u.userId, action: 'appointment_reminder_sent', entity: 'appointment', entityId: id });
+  return c.json({ ok: true, to: appt.patientEmail });
+});
+
 // Horários do dia para um psicólogo: ocupados + livres dentro do expediente.
 // Usado pela Ana para responder "quais horários tenho no dia 8?".
 appointmentRoutes.get('/day', requireAuth, clinicRoles, async (c) => {

@@ -64,9 +64,29 @@ export default function AnaChat({ patientId }: { patientId?: string }) {
     }
   }
 
+  // Reenvio de lembrete de uma consulta que já está na agenda.
+  async function confirmarLembrete() {
+    if (acao?.type !== 'remind' || agendando) return;
+    setAgendando(true);
+    setError('');
+    try {
+      const res = await api.appointmentRemind(acao.appointmentId);
+      const alvo = acao.patientName;
+      setAcao(null);
+      setMessages((m) => [
+        ...m,
+        { role: 'assistant', content: `Lembrete enviado para ${alvo} em ${res.to}.` },
+      ]);
+    } catch {
+      setError('Não consegui enviar o lembrete. Tente novamente.');
+    } finally {
+      setAgendando(false);
+    }
+  }
+
   // Só aqui a consulta entra na agenda de verdade.
   async function confirmarAgendamento() {
-    if (!acao || agendando) return;
+    if (acao?.type !== 'schedule' || agendando) return;
     setAgendando(true);
     setError('');
     try {
@@ -171,7 +191,35 @@ export default function AnaChat({ patientId }: { patientId?: string }) {
             {busy && <div className="ana-msg assistant ana-typing">{t('anaChat.typing')}</div>}
             {lendo && <div className="ana-msg assistant ana-typing">Lendo o documento…</div>}
 
-            {acao && (
+            {acao?.type === 'remind' && (
+              <div className="ana-action">
+                <div className="ana-action-head">Enviar lembrete</div>
+                <dl className="ana-action-fields">
+                  <dt>Paciente</dt>
+                  <dd>{acao.patientName}</dd>
+                  <dt>Consulta</dt>
+                  <dd>
+                    {new Date(acao.startsAt).toLocaleDateString('pt-BR', {
+                      weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric',
+                    })}
+                    {' às '}
+                    {new Date(acao.startsAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                  </dd>
+                  <dt>Enviar para</dt>
+                  <dd>{acao.patientEmail}</dd>
+                </dl>
+                <div className="ana-action-buttons">
+                  <button className="ghost" onClick={() => setAcao(null)} disabled={agendando}>
+                    Cancelar
+                  </button>
+                  <button className="btn sm" onClick={confirmarLembrete} disabled={agendando}>
+                    {agendando ? 'Enviando…' : 'Enviar e-mail'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {acao?.type === 'schedule' && (
               <div className="ana-action">
                 <div className="ana-action-head">Confirmar agendamento</div>
                 <dl className="ana-action-fields">

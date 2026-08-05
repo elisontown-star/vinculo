@@ -1267,7 +1267,109 @@ async function agendaResumo(c: any, user: AuthUser): Promise<string> {
   );
 }
 
+type AcaoLembrete = {
+  type: 'remind';
+  appointmentId: string;
+  patientName: string;
+  patientEmail: string;
+  startsAt: number;
+  durationMin: number;
+};
+
+type AcaoAna = AcaoAgendar | AcaoLembrete;
+
 const BLOCO_AGENDAR = /<<<AGENDAR>>>([\s\S]*?)<<<FIM>>>/;
+const BLOCO_LEMBRETE = /<<<LEMBRETE>>>([\s\S]*?)<<<FIM>>>/;
+
+// Resolve o pedido de lembrete numa consulta concreta do paciente citado.
+async function extrairLembrete(
+  c: any,
+  user: AuthUser,
+  resposta: string,
+  patientIdAberto?: string,
+): Promise<{ texto: string; acao: AcaoLembrete | null }> {
+  const m = resposta.match(BLOCO_LEMBRETE);
+  const texto = resposta.replace(/<<<LEMBRETE>>>[\s\S]*?(<<<FIM>>>|$)/, '').trim();
+  if (!m) return { texto: resposta.trim(), acao: null };
+
+  let dados: any;
+  try {
+    dados = JSON.parse(m[1].trim());
+  } catch {
+    return { texto, acao: null };
+  }
+
+  const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+  const nome = norm(String(dados?.paciente ?? ''));
+  const vis = visibilityFilter(user);
+  const lista = await getDb(c.env)
+    .select({ id: patients.id, fullName: patients.fullName, email: patients.email })
+    .from(patients)
+    .where(and(eq(patients.clinicId, user.clinicId), isNull(patients.deletedAt), vis))
+    .limit(300)
+    .all();
+
+  let alvo = nome
+    ? lista.find((p) => norm(p.fullName) === nome) ??
+      lista.find((p) => norm(p.fullName).includes(nome) || nome.includes(norm(p.fullName)))
+    : undefined;
+  if (!alvo && patientIdAberto) alvo = lista.find((p) => p.id === patientIdAberto);
+  if (!alvo) {
+    return { texto: `${texto}\n\n(Não localizei esse paciente no cadastro.)`.trim(), acao: null };
+  }
+  if (!alvo.email) {
+    return {
+      texto: `${texto}\n\n(${alvo.fullName} não tem e-mail no cadastro, então não consigo enviar o lembrete.)`.trim(),
+      acao: null,
+    };
+  }
+
+  // Consulta alvo: a do dia informado ou a próxima marcada.
+  const data = String(dados?.data ?? '').trim();
+  const temData = /^\d{4}-\d{2}-\d{2}$/.test(data);
+  const de = temData ? new Date(`${data}T00:00:00-03:00`).getTime() : Date.now();
+  const ate = temData ? de + 86400000 : de + 180 * 86400000;
+
+  const candidatas = await getDb(c.env)
+    .select({
+      id: appointments.id,
+      startsAt: appointments.startsAt,
+      endsAt: appointments.endsAt,
+      status: appointments.status,
+    })
+    .from(appointments)
+    .where(and(
+      eq(appointments.clinicId, user.clinicId),
+      eq(appointments.patientId, alvo.id),
+      gte(appointments.startsAt, new Date(de)),
+      lte(appointments.startsAt, new Date(ate)),
+    ))
+    .all();
+
+  const ms = (v: unknown) => (v instanceof Date ? v.getTime() : Number(v));
+  const escolhida = candidatas
+    .filter((a) => a.status !== 'canceled')
+    .sort((a, b) => ms(a.startsAt) - ms(b.startsAt))[0];
+
+  if (!escolhida) {
+    return {
+      texto: `${texto}\n\n(Não encontrei consulta marcada para ${alvo.fullName}${temData ? ' nesse dia' : ''}.)`.trim(),
+      acao: null,
+    };
+  }
+
+  return {
+    texto,
+    acao: {
+      type: 'remind',
+      appointmentId: escolhida.id,
+      patientName: alvo.fullName,
+      patientEmail: alvo.email,
+      startsAt: ms(escolhida.startsAt),
+      durationMin: Math.round((ms(escolhida.endsAt) - ms(escolhida.startsAt)) / 60000),
+    },
+  };
+}
 
 async function extrairAgendamento(
   c: any,
@@ -1479,10 +1581,14 @@ patientRoutes.post('/ana-chat', blockSecretary, zValidator('json', chatSchema), 
     return c.json({ error: 'ai_error' }, 500);
   }
 
-  // A Ana pode propor um agendamento. O bloco sai do texto e vira um cartão
-  // de confirmação — nada entra na agenda sem o psicólogo clicar.
-  const { texto, acao } = await extrairAgendamento(c, user, result, patientId);
-  return c.json({ reply: texto, action: acao });
+  // A Ana pode propor ações (agendar, lembrar por e-mail). Os blocos saem do
+  // texto e viram cartões de confirmação — nada acontece sem o psicólogo clicar.
+  const ag = await extrairAgendamento(c, user, result, patientId);
+  let acao: AcaoAna | null = ag.acao;
+  const lb = await extrairLembrete(c, user, ag.texto, patientId);
+  if (!acao) acao = lb.acao;
+
+  return c.json({ reply: lb.texto, action: acao });
   } catch (err: any) {
     console.error('[ana-chat] erro:', err);
     return c.json({ error: 'internal_error' }, 500);

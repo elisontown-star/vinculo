@@ -40,8 +40,8 @@ export type AnaProposal = {
   timeline?: AnaTimelineEvent[];
   summary?: string;
 };
-// Ação que a Ana propõe no chat — só vira realidade após confirmação na tela.
-export type AnaAction = {
+// Ações que a Ana propõe no chat — só viram realidade após confirmação na tela.
+export type AnaScheduleAction = {
   type: 'schedule';
   patientId: string;
   patientName: string;
@@ -52,6 +52,15 @@ export type AnaAction = {
   notes: string;
   conflicts: { patientName: string | null; startsAt: number; endsAt: number }[];
 };
+export type AnaRemindAction = {
+  type: 'remind';
+  appointmentId: string;
+  patientName: string;
+  patientEmail: string;
+  startsAt: number;
+  durationMin: number;
+};
+export type AnaAction = AnaScheduleAction | AnaRemindAction;
 export type AnaExtractResult = {
   fileId: string | null;
   fileName: string;
@@ -297,6 +306,8 @@ export const api = {
     req('/appointments', { method: 'POST', body: JSON.stringify(b) }),
   appointmentsDay: (date: string, psychologistId?: string): Promise<{ date: string; psychologistId: string; appointments: { id: string; startsAt: number; endsAt: number; patientName: string | null; status: string }[] }> =>
     req(`/appointments/day?date=${date}${psychologistId ? `&psychologistId=${psychologistId}` : ''}`),
+  appointmentRemind: (id: string): Promise<{ ok: boolean; to: string }> =>
+    req(`/appointments/${id}/remind`, { method: 'POST' }),
   appointmentUpdate: (id: string, b: { startsAt?: number; endsAt?: number; status?: string; notes?: string }): Promise<{ ok: boolean }> =>
     req(`/appointments/${id}`, { method: 'PATCH', body: JSON.stringify(b) }),
   appointmentDelete: (id: string): Promise<{ ok: boolean }> =>
