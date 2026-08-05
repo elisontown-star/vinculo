@@ -1,9 +1,26 @@
 import { useState, useRef, useEffect } from 'react';
 import { api } from './lib/api';
+import type { AnaExtractResult } from './lib/api';
 import { useI18n } from './i18n';
 import { AnaFace } from './anaAvatar';
+import AnaExtractReview from './AnaExtractReview';
 
 type Msg = { role: 'user' | 'assistant'; content: string };
+
+// Formatos que a Ana consegue ler (mesma allowlist do upload da biblioteca).
+const ACEITOS = '.pdf,.doc,.docx,.xls,.xlsx,.csv,.png,.jpg,.jpeg,.webp';
+const MAX_BYTES = 15 * 1024 * 1024;
+
+const ERROS: Record<string, string> = {
+  invalid_mime_type: 'Formato não suportado. Envie PDF, Word, planilha ou imagem.',
+  file_too_large: 'Arquivo muito grande (máximo 15 MB).',
+  empty_file: 'O arquivo está vazio.',
+  unreadable_document: 'Não consegui abrir esse documento.',
+  no_text_found: 'Não encontrei texto legível no documento.',
+  ai_failed: 'A leitura falhou. Tente novamente.',
+  unparsable_response: 'A leitura falhou. Tente novamente.',
+  invalid_proposal: 'A leitura falhou. Tente novamente.',
+};
 
 export default function AnaChat({ patientId }: { patientId?: string }) {
   const { t } = useI18n();
@@ -12,11 +29,14 @@ export default function AnaChat({ patientId }: { patientId?: string }) {
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [lendo, setLendo] = useState(false);
+  const [extracao, setExtracao] = useState<AnaExtractResult | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     bodyRef.current?.scrollTo({ top: bodyRef.current.scrollHeight, behavior: 'smooth' });
-  }, [messages, busy]);
+  }, [messages, busy, lendo, extracao]);
 
   async function send() {
     const text = input.trim();
@@ -40,12 +60,37 @@ export default function AnaChat({ patientId }: { patientId?: string }) {
     }
   }
 
+  async function anexar(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // permite reenviar o mesmo arquivo
+    if (!file || !patientId) return;
+    if (file.size > MAX_BYTES) {
+      setError(ERROS.file_too_large);
+      return;
+    }
+
+    setError('');
+    setLendo(true);
+    setMessages((m) => [...m, { role: 'user', content: `📎 ${file.name}` }]);
+    try {
+      const res = await api.anaExtract(patientId, file);
+      setExtracao(res);
+    } catch (err) {
+      const code = err instanceof Error ? err.message : '';
+      setError(ERROS[code] ?? 'Não consegui ler o documento.');
+    } finally {
+      setLendo(false);
+    }
+  }
+
   function onKey(e: React.KeyboardEvent) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       send();
     }
   }
+
+  const ocupado = busy || lendo;
 
   return (
     <>
@@ -64,10 +109,16 @@ export default function AnaChat({ patientId }: { patientId?: string }) {
           </div>
 
           <div className="ana-chat-body" ref={bodyRef}>
-            {messages.length === 0 && (
+            {messages.length === 0 && !extracao && (
               <div className="ana-chat-welcome">
                 <p>{t('anaChat.welcome')}</p>
                 {patientId && <p className="ana-chat-ctx">{t('anaChat.hasPatient')}</p>}
+                {patientId && (
+                  <p className="ana-chat-ctx">
+                    Você também pode anexar um PDF ou Word — eu leio e proponho o preenchimento
+                    do prontuário.
+                  </p>
+                )}
               </div>
             )}
             {messages.map((m, i) => (
@@ -76,19 +127,48 @@ export default function AnaChat({ patientId }: { patientId?: string }) {
               </div>
             ))}
             {busy && <div className="ana-msg assistant ana-typing">{t('anaChat.typing')}</div>}
+            {lendo && <div className="ana-msg assistant ana-typing">Lendo o documento…</div>}
+
+            {extracao && patientId && (
+              <AnaExtractReview
+                patientId={patientId}
+                result={extracao}
+                onCancel={() => setExtracao(null)}
+                onApplied={(resumo) => {
+                  setExtracao(null);
+                  setMessages((m) => [...m, { role: 'assistant', content: resumo }]);
+                }}
+              />
+            )}
+
             {error && <div className="ana-chat-err">{error}</div>}
           </div>
 
           <div className="ana-chat-input">
+            <input
+              ref={fileRef}
+              type="file"
+              accept={ACEITOS}
+              onChange={anexar}
+              style={{ display: 'none' }}
+            />
+            <button
+              className="ana-clip"
+              onClick={() => fileRef.current?.click()}
+              disabled={ocupado || !patientId}
+              title={patientId ? 'Anexar documento (PDF, Word, planilha ou imagem)' : 'Abra um paciente para anexar documentos'}
+            >
+              📎
+            </button>
             <textarea
               rows={1}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={onKey}
               placeholder={t('anaChat.placeholder')}
-              disabled={busy}
+              disabled={ocupado}
             />
-            <button onClick={send} disabled={busy || !input.trim()}>➤</button>
+            <button onClick={send} disabled={ocupado || !input.trim()}>➤</button>
           </div>
           <p className="ana-chat-note">{t('anaChat.note')}</p>
         </div>

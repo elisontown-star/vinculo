@@ -5,6 +5,7 @@ import { and, eq, desc, asc, isNull, isNotNull, inArray, gt, gte, lte, or, sql }
 import { getDb } from '../lib/db';
 import { patients, sessions, timelineEvents, clinicalShares, patientFiles, appointments } from '@vinculo/db/schema';
 import { ANA_PERSONA, ANA_FULL_ANALYSIS } from '../lib/anaPrompt';
+import { EXTRACT_SYSTEM, proposalSchema, parseJsonObject, pruneEmpty } from '../lib/anaExtract';
 import { requireAuth } from '../middleware/auth';
 import { audit } from '../lib/audit';
 import type { AppBindings, AuthUser } from '../types';
@@ -912,6 +913,181 @@ patientRoutes.post('/:id/files', async (c) => {
     .get();
   await audit(c.env, { clinicId: user.clinicId, actorUserId: user.userId, action: 'file_uploaded', entity: 'patient_file', entityId: row.id });
   return c.json({ ok: true, id: row.id });
+});
+
+// ---- Ana Luiza: leitura de documento e proposta de preenchimento -----------
+// O arquivo vai no CORPO (binário); metadados na query string, igual ao upload.
+// A Ana lê e PROPÕE — nada é gravado aqui. Quem grava é /ana-apply.
+patientRoutes.post('/:id/ana-extract', requireClinicalAccess, async (c) => {
+  const user = c.get('user');
+  const id = c.req.param('id');
+
+  const fileName = sanitizeFileName(c.req.query('fileName') || 'documento');
+  const mimeRaw = (c.req.query('mime') || '').trim().toLowerCase();
+  if (!ALLOWED_MIME_TYPES.has(mimeRaw)) return c.json({ error: 'invalid_mime_type' }, 415);
+
+  const buf = await c.req.arrayBuffer();
+  if (!buf || buf.byteLength === 0) return c.json({ error: 'empty_file' }, 400);
+  if (buf.byteLength > MAX_FILE_BYTES) return c.json({ error: 'file_too_large' }, 413);
+
+  // 1) Arquiva na biblioteca do paciente (mantém rastro de quem enviou).
+  let fileId: string | null = null;
+  try {
+    const key = `${user.clinicId}/${id}/${crypto.randomUUID()}`;
+    await c.env.DOCS.put(key, buf, { httpMetadata: { contentType: mimeRaw } });
+    const saved = await getDb(c.env)
+      .insert(patientFiles)
+      .values({
+        clinicId: user.clinicId, patientId: id, category: 'outros', fileName,
+        mime: mimeRaw, size: buf.byteLength, r2Key: key, uploadedBy: user.userId,
+      })
+      .returning({ id: patientFiles.id })
+      .get();
+    fileId = saved.id;
+    await audit(c.env, { clinicId: user.clinicId, actorUserId: user.userId, action: 'file_uploaded', entity: 'patient_file', entityId: saved.id });
+  } catch (err) {
+    console.error('[ana-extract] falha ao arquivar:', err instanceof Error ? err.message : String(err));
+    // Segue mesmo assim: a leitura é o que importa para o psicólogo.
+  }
+
+  // 2) Converte o documento em markdown (PDF, Word, planilha, imagem).
+  let markdown = '';
+  try {
+    const conv: any = await (c.env.AI as any).toMarkdown([
+      { name: fileName, blob: new Blob([buf], { type: mimeRaw }) },
+    ]);
+    const first = Array.isArray(conv) ? conv[0] : conv;
+    if (first?.format === 'error') {
+      console.error('[ana-extract] conversao falhou:', first.error);
+      return c.json({ error: 'unreadable_document', fileId }, 422);
+    }
+    markdown = (first?.data ?? '').toString().trim();
+  } catch (err) {
+    console.error('[ana-extract] toMarkdown falhou:', err instanceof Error ? err.message : String(err));
+    return c.json({ error: 'unreadable_document', fileId }, 422);
+  }
+  if (markdown.length < 20) return c.json({ error: 'no_text_found', fileId }, 422);
+
+  // Corta documentos muito longos para caber no contexto do modelo.
+  const MAX_DOC_CHARS = 24000;
+  const truncated = markdown.length > MAX_DOC_CHARS;
+  const docText = truncated ? markdown.slice(0, MAX_DOC_CHARS) : markdown;
+
+  // 3) Pede a extração estruturada, informando o que já existe na ficha.
+  const patientRow = await findPatient(c, user, id);
+  const existing = patientRow?.profile ? JSON.parse(patientRow.profile) : {};
+  const preenchidos = Object.entries(existing)
+    .flatMap(([grupo, val]) =>
+      val && typeof val === 'object'
+        ? Object.entries(val as Record<string, unknown>).filter(([, v]) => v).map(([k]) => `${grupo}.${k}`)
+        : [],
+    )
+    .join(', ');
+
+  const userPrompt =
+    (preenchidos ? `CAMPOS JÁ PREENCHIDOS NA FICHA (só proponha se o documento trouxer algo diferente ou mais completo): ${preenchidos}\n\n` : '') +
+    `DOCUMENTO "${fileName}"${truncated ? ' (trecho inicial)' : ''}:\n\n${docText}`;
+
+  let raw = '';
+  try {
+    const res: any = await c.env.AI.run('@cf/meta/llama-3.3-70b-instruct-fp8-fast', {
+      messages: [
+        { role: 'system', content: EXTRACT_SYSTEM },
+        { role: 'user', content: userPrompt },
+      ],
+      max_tokens: 2000,
+      temperature: 0.1,
+    });
+    raw = (res?.response ?? '').toString();
+  } catch (err) {
+    console.error('[ana-extract] IA falhou:', err instanceof Error ? err.message : String(err));
+    return c.json({ error: 'ai_failed', fileId }, 502);
+  }
+
+  const parsed = parseJsonObject(raw);
+  if (!parsed) return c.json({ error: 'unparsable_response', fileId }, 502);
+
+  const check = proposalSchema.safeParse(parsed);
+  if (!check.success) return c.json({ error: 'invalid_proposal', fileId }, 502);
+
+  const proposal = pruneEmpty(check.data) ?? {};
+  await audit(c.env, { clinicId: user.clinicId, actorUserId: user.userId, action: 'ana_extract', entity: 'patient', entityId: id, metadata: { fileName, truncated } });
+
+  return c.json({ fileId, fileName, truncated, proposal });
+});
+
+// Aplica no prontuário apenas o que o psicólogo confirmou na revisão.
+const applySchema = z.object({
+  profile: z.record(z.record(z.union([z.string(), z.number(), z.boolean()]))).optional(),
+  session: sessionSchema.optional(),
+  timeline: z.array(eventSchema).max(20).optional(),
+});
+
+patientRoutes.post('/:id/ana-apply', requireClinicalAccess, zValidator('json', applySchema), async (c) => {
+  const user = c.get('user');
+  const id = c.req.param('id');
+  const { profile, session, timeline } = c.req.valid('json');
+  const db = getDb(c.env);
+
+  const patientRow = await findPatient(c, user, id);
+  if (!patientRow) return c.json({ error: 'not_found' }, 404);
+
+  const applied = { profileFields: 0, session: false, timeline: 0 };
+
+  // 1) Ficha: mescla por grupo, preservando o que não foi enviado.
+  if (profile && Object.keys(profile).length) {
+    const current = patientRow.profile ? JSON.parse(patientRow.profile) : {};
+    for (const [grupo, campos] of Object.entries(profile)) {
+      current[grupo] = { ...(current[grupo] ?? {}), ...campos };
+      applied.profileFields += Object.keys(campos).length;
+    }
+    const serialized = JSON.stringify(current);
+    if (serialized.length > MAX_PROFILE_JSON_BYTES) return c.json({ error: 'profile_too_large' }, 413);
+    await db.update(patients).set({ profile: serialized })
+      .where(and(eq(patients.id, id), eq(patients.clinicId, user.clinicId)));
+  }
+
+  // 2) Consulta extraída do documento.
+  if (session && Object.keys(session).length) {
+    const occurredAt = session.occurredAt ? new Date(session.occurredAt) : new Date();
+    await db.insert(sessions).values({
+      clinicId: user.clinicId,
+      patientId: id,
+      psychologistId: user.userId,
+      occurredAt: isNaN(occurredAt.getTime()) ? new Date() : occurredAt,
+      durationMin: session.durationMin ?? null,
+      mood: session.mood ?? null,
+      emotionalScale: session.emotionalScale ?? null,
+      topics: session.topics?.length ? JSON.stringify(session.topics) : null,
+      objectives: session.objectives ?? null,
+      techniques: session.techniques ?? null,
+      evolution: session.evolution ?? null,
+      nextSteps: session.nextSteps ?? null,
+      freeNotes: session.freeNotes ?? null,
+    });
+    applied.session = true;
+  }
+
+  // 3) Linha do tempo: entra como sugestão, para confirmação posterior.
+  if (timeline?.length) {
+    for (const ev of timeline) {
+      const d = ev.eventDate ? new Date(ev.eventDate) : ev.year ? new Date(ev.year, 0, 1) : null;
+      await db.insert(timelineEvents).values({
+        clinicId: user.clinicId,
+        patientId: id,
+        title: ev.title,
+        description: ev.description ?? null,
+        eventDate: d && !isNaN(d.getTime()) ? d : null,
+        category: ev.category ?? null,
+        status: 'suggested',
+        source: 'ai',
+      });
+      applied.timeline++;
+    }
+  }
+
+  await audit(c.env, { clinicId: user.clinicId, actorUserId: user.userId, action: 'ana_apply', entity: 'patient', entityId: id, metadata: applied });
+  return c.json({ ok: true, applied });
 });
 
 // Download: transmite os bytes direto do R2.

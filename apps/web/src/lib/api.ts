@@ -13,6 +13,40 @@ export const getUser = () => {
 
 export type Profile = Record<string, any>;
 
+// --- Extração assistida da Ana (documento -> proposta de prontuário) --------
+export type AnaProfile = Record<string, Record<string, string | number | boolean>>;
+export type AnaSession = {
+  occurredAt?: string;
+  durationMin?: number;
+  mood?: string;
+  emotionalScale?: number;
+  topics?: string[];
+  objectives?: string;
+  techniques?: string;
+  evolution?: string;
+  nextSteps?: string;
+  freeNotes?: string;
+};
+export type AnaTimelineEvent = {
+  title: string;
+  description?: string;
+  eventDate?: string;
+  year?: number;
+  category?: string;
+};
+export type AnaProposal = {
+  profile?: AnaProfile;
+  session?: AnaSession;
+  timeline?: AnaTimelineEvent[];
+  summary?: string;
+};
+export type AnaExtractResult = {
+  fileId: string | null;
+  fileName: string;
+  truncated: boolean;
+  proposal: AnaProposal;
+};
+
 export type AdminClinic = {
   id: string;
   name: string;
@@ -302,4 +336,28 @@ export const api = {
     body: { patientId?: string; messages: { role: 'user' | 'assistant'; content: string }[] },
   ): Promise<{ reply: string }> =>
     req('/patients/ana-chat', { method: 'POST', body: JSON.stringify(body) }),
+
+  // --- Ana Luiza: leitura de documento (PDF/Word) e preenchimento assistido ---
+  anaExtract: async (patientId: string, file: File): Promise<AnaExtractResult> => {
+    const qs = new URLSearchParams({
+      fileName: file.name,
+      mime: file.type || 'application/octet-stream',
+    });
+    const res = await fetch(`${BASE}/patients/${patientId}/ana-extract?${qs.toString()}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token()}` },
+      body: file,
+    });
+    if (!res.ok) {
+      let err = 'extract_failed';
+      try { err = (await res.json()).error || err; } catch { /* ignora */ }
+      throw new Error(err);
+    }
+    return res.json();
+  },
+  anaApply: (
+    patientId: string,
+    body: { profile?: AnaProfile; session?: AnaSession; timeline?: AnaTimelineEvent[] },
+  ): Promise<{ ok: boolean; applied: { profileFields: number; session: boolean; timeline: number } }> =>
+    req(`/patients/${patientId}/ana-apply`, { method: 'POST', body: JSON.stringify(body) }),
 };

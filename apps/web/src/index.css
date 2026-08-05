@@ -584,7 +584,39 @@ input, textarea, select, button { font-family: inherit; }
   width: 42px; font-size: 16px; cursor: pointer; flex: none;
 }
 .ana-chat-input button:disabled { opacity: 0.5; cursor: default; }
+/* Clipe de anexo: discreto, ao lado do campo de texto. */
+.ana-chat-input button.ana-clip {
+  background: var(--line-soft); color: var(--ink); width: 38px; font-size: 15px;
+}
+.ana-chat-input button.ana-clip:hover:not(:disabled) { background: var(--line); }
 .ana-chat-note { font-size: 10.5px; color: var(--muted); text-align: center; margin: 0; padding: 6px 12px 10px; background: var(--surface); }
+
+/* Revisão da leitura de documento pela Ana ---------------------------------- */
+.ana-extract {
+  border: 1px solid var(--line); border-radius: 12px; background: var(--surface);
+  padding: 12px; margin: 8px 0; font-size: 13px;
+}
+.ana-extract-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; }
+.ana-extract-head strong { font-size: 13.5px; }
+.ana-extract-file { font-size: 11.5px; color: var(--muted); word-break: break-all; }
+.ana-extract-summary { margin: 0 0 8px; color: var(--ink); line-height: 1.5; }
+.ana-extract-warn, .ana-extract-empty, .ana-extract-hint, .ana-extract-sub {
+  font-size: 11.5px; color: var(--muted); margin: 0 0 8px; line-height: 1.45;
+}
+.ana-extract-group { margin-bottom: 10px; }
+.ana-extract-group h4 {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--muted); margin: 0 0 5px; font-weight: 700;
+}
+.ana-extract-item {
+  display: grid; grid-template-columns: 18px 1fr; gap: 4px 8px;
+  align-items: start; padding: 5px 0; border-top: 1px solid var(--line-soft);
+  cursor: pointer;
+}
+.ana-extract-item input { margin-top: 2px; accent-color: var(--orange); }
+.ana-extract-label { font-weight: 600; font-size: 12px; }
+.ana-extract-value { grid-column: 2; color: var(--muted); line-height: 1.45; word-break: break-word; }
+.ana-extract-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
 
 /* Requisitos de senha no cadastro */
 .pw-rules { list-style: none; margin: -6px 0 12px; padding: 10px 12px; background: var(--line-soft); border-radius: var(--radius-sm); display: flex; flex-direction: column; gap: 4px; }
