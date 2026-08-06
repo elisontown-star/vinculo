@@ -125,6 +125,7 @@ function GoogleCompleteForm({ pendingKey, onDone }: { pendingKey: string; onDone
   const { t } = useI18n();
   const [clinicName, setClinicName] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
+  const [plan, setPlan] = useState<'essencial' | 'pro'>('essencial');
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [error, setError] = useState('');
@@ -292,7 +293,7 @@ function Auth({ onDone }: { onDone: () => void }) {
     try {
       const res: any =
         mode === 'register'
-          ? await api.register({ clinicName: clinicName.trim(), name: name.trim(), email: email.trim(), password, whatsapp: whatsapp.replace(/\D/g, '') })
+          ? await api.register({ clinicName: clinicName.trim(), name: name.trim(), email: email.trim(), password, whatsapp: whatsapp.replace(/\D/g, ''), plan })
           : await api.login({ email, password });
 
       if (res.mfaSetupRequired) {
@@ -474,6 +475,17 @@ function Auth({ onDone }: { onDone: () => void }) {
                 <div className="field">
                   <label htmlFor="name">{t('lbl.yourName')}</label>
                   <input id="name" value={name} onChange={(e) => setName(e.target.value)} required />
+                </div>
+                <div className="field">
+                  <label>{t('lbl.plan')}</label>
+                  <div className="plan-picker">
+                    {(['essencial', 'pro'] as const).map((p) => (
+                      <button type="button" key={p} className={`plan-card ${plan === p ? 'on' : ''}`} onClick={() => setPlan(p)}>
+                        <span className="plan-name">{t('plan.' + p)}</span>
+                        <span className="plan-seats">{t('plan.' + p + '.seats')}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </>
             )}

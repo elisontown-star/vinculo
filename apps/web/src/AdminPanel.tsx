@@ -188,7 +188,7 @@ export default function AdminPanel({ onLogout, onViewClinic }: { onLogout: () =>
     }
   }
 
-  async function changePlan(plan: 'essencial') {
+  async function changePlan(plan: 'essencial' | 'pro') {
     if (!selected || (selected.plan ?? 'essencial') === plan) return;
     try {
       await api.adminSetPlan(selected.id, plan);
@@ -359,7 +359,7 @@ export default function AdminPanel({ onLogout, onViewClinic }: { onLogout: () =>
                 )}
                 <div className="admin-plan-picker">
                   <span className="admin-plan-label">{t('admin.plan')}</span>
-                  {(['essencial'] as const).map((p) => (
+                  {(['essencial', 'pro'] as const).map((p) => (
                     <button
                       key={p}
                       className={`admin-plan-opt ${(selected.plan ?? 'essencial') === p ? 'on' : ''}`}

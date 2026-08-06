@@ -19,7 +19,7 @@ import {
 import { requireAuth, requireRole } from '../middleware/auth';
 import { sendPasswordResetEmail } from '../lib/email';
 import { verifyTotp, consumeRecoveryCode } from '../lib/mfa';
-import { PLAN_LIMITS, type PlanKey } from '../lib/plans';
+import { planLimits, normalizePlan } from '../lib/plans';
 import { audit } from '../lib/audit';
 import type { AppBindings } from '../types';
 
@@ -53,7 +53,7 @@ adminRoutes.get('/clinics', async (c) => {
       isActive: clinic.isActive ?? true,
       status: clinic.status ?? 'trial',
       trialEndsAt: clinic.trialEndsAt ?? null,
-      plan: clinic.plan ?? 'essencial',
+      plan: normalizePlan(clinic.plan),
       companyCode: clinic.companyCode ?? null,
       users: uMap.get(clinic.id) ?? 0,
       patients: pMap.get(clinic.id) ?? 0,
@@ -387,7 +387,7 @@ adminRoutes.post('/clinics/:id/extend-trial', zValidator('json', extendSchema), 
 // --- Mudar o plano da clínica (upgrade/downgrade) ----------------------------
 // Ação do super admin (o owner apenas solicita por e-mail). No downgrade,
 // bloqueia se a clínica já tiver mais usuários do que o novo plano comporta.
-const planSchema = z.object({ plan: z.enum(['essencial']) });
+const planSchema = z.object({ plan: z.enum(['essencial', 'pro']) });
 adminRoutes.post('/clinics/:id/plan', zValidator('json', planSchema), async (c) => {
   const clinicId = c.req.param('id');
   const { plan } = c.req.valid('json');
@@ -407,7 +407,7 @@ adminRoutes.post('/clinics/:id/plan', zValidator('json', planSchema), async (c) 
     .where(and(eq(users.clinicId, clinicId), eq(users.role, 'secretary')))
     .get();
   const usage = { psychologist: psychRow?.n ?? 0, secretary: secRow?.n ?? 0 };
-  const limit = PLAN_LIMITS[plan as PlanKey];
+  const limit = planLimits(plan);
   if (usage.psychologist > limit.psychologist || usage.secretary > limit.secretary) {
     return c.json({ error: 'plan_downgrade_blocked', usage, limit, plan }, 409);
   }

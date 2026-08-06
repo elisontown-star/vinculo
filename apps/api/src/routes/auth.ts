@@ -100,6 +100,7 @@ const registerSchema = z.object({
   email: z.string().trim().email(),
   password: strongPassword,
   whatsapp: whatsappField,
+  plan: z.enum(['essencial', 'pro']).default('essencial'),
 });
 
 // Cria a clínica (tenant) + o usuário dono. Ponto de entrada de uma nova clínica.
@@ -108,7 +109,7 @@ authRoutes.post('/register', zValidator('json', registerSchema), async (c) => {
   if (!(await rateLimit(c.env, `register:${ip}`, 5, 300))) {
     return c.json({ error: 'rate_limited' }, 429);
   }
-  const { clinicName, name, email, password, whatsapp } = c.req.valid('json');
+  const { clinicName, name, email, password, whatsapp, plan } = c.req.valid('json');
   const db = getDb(c.env);
 
   const existing = await db.select().from(users).where(eq(users.email, email)).get();
@@ -126,7 +127,7 @@ authRoutes.post('/register', zValidator('json', registerSchema), async (c) => {
   const trialEndsAt = Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000;
   const clinic = await db
     .insert(clinics)
-    .values({ name: clinicName, status: 'trial', trialEndsAt, plan: 'essencial', whatsapp, companyCode })
+    .values({ name: clinicName, status: 'trial', trialEndsAt, plan, whatsapp, companyCode })
     .returning()
     .get();
   const passwordHash = await hashPassword(password);

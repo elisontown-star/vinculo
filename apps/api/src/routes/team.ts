@@ -9,7 +9,7 @@ import { hashPassword } from '../lib/password';
 import { sendInviteEmail, sendPlanRequestEmail } from '../lib/email';
 import { audit } from '../lib/audit';
 import { rateLimit, clientIp } from '../lib/ratelimit';
-import { PLAN_LIMITS, type PlanKey } from '../lib/plans';
+import { planLimits, normalizePlan } from '../lib/plans';
 import type { AppBindings } from '../types';
 
 export const teamRoutes = new Hono<AppBindings>();
@@ -25,7 +25,7 @@ teamRoutes.get('/', requireAuth, requireRole('owner', 'psychologist'), async (c)
   const db = getDb(c.env);
   const rows = await db.select().from(users).where(eq(users.clinicId, user.clinicId)).all();
   const clinic = await db.select().from(clinics).where(eq(clinics.id, user.clinicId)).get();
-  const plan = (clinic?.plan ?? 'essencial') as PlanKey;
+  const plan = normalizePlan(clinic?.plan);
   const usage = { psychologist: 0, secretary: 0 };
   for (const u of rows) {
     // O owner é um psicólogo e ocupa uma vaga de psicólogo do plano.
@@ -42,7 +42,7 @@ teamRoutes.get('/', requireAuth, requireRole('owner', 'psychologist'), async (c)
       mfaEnabled: u.mfaEnabled,
     })),
     clinic: clinic ? { companyCode: clinic.companyCode, plan } : null,
-    limits: PLAN_LIMITS[plan],
+    limits: planLimits(clinic?.plan),
     usage,
   });
 });
@@ -77,8 +77,8 @@ teamRoutes.post('/invite', requireAuth, requireRole('owner', 'psychologist'), zV
   // Limite de vagas do plano: conta quantos já existem naquele papel (ativos e
   // convites pendentes contam) e barra se o plano estiver cheio.
   if (role === 'psychologist' || role === 'secretary') {
-    const plan = (clinic.plan ?? 'essencial') as PlanKey;
-    const limit = PLAN_LIMITS[plan][role];
+    const plan = normalizePlan(clinic.plan);
+    const limit = planLimits(clinic.plan)[role];
     // O owner conta como psicólogo; secretárias contam à parte.
     const roleFilter =
       role === 'psychologist'
@@ -200,7 +200,7 @@ teamRoutes.post('/invite/accept', zValidator('json', acceptSchema), async (c) =>
 // O owner não muda o plano sozinho: ele solicita, e a mudança é aplicada pelo
 // super admin no portal. Aqui apenas enviamos um e-mail para os administradores.
 const planRequestSchema = z.object({
-  plan: z.enum(['essencial']),
+  plan: z.enum(['essencial', 'pro']),
   message: z.string().max(500).optional(),
 });
 teamRoutes.post('/plan-request', requireAuth, requireRole('owner'), zValidator('json', planRequestSchema), async (c) => {

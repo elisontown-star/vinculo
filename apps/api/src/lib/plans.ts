@@ -1,12 +1,23 @@
-// Plano comercial e limites de vagas por clínica.
-// Hoje existe um plano único; a estrutura de mapa fica para facilitar a volta
-// de outros planos no futuro sem mexer em quem consome PLAN_LIMITS.
+// Planos comerciais e limites de vagas por clínica.
+// Essencial atende o psicólogo autônomo; Pro, clínicas pequenas.
 export const PLAN_LIMITS = {
-  essencial: { psychologist: 3, secretary: 3 },
+  essencial: { psychologist: 1, secretary: 1 },
+  pro: { psychologist: 3, secretary: 3 },
 } as const;
 
 export type PlanKey = keyof typeof PLAN_LIMITS;
 export const PLAN_KEYS = Object.keys(PLAN_LIMITS) as PlanKey[];
+export const DEFAULT_PLAN: PlanKey = 'essencial';
+
+// Clínicas criadas antes da simplificação ainda podem ter 'plus' gravado.
+// Normaliza para um plano existente para não devolver limites indefinidos.
+export function normalizePlan(raw: string | null | undefined): PlanKey {
+  return raw && raw in PLAN_LIMITS ? (raw as PlanKey) : DEFAULT_PLAN;
+}
+
+export function planLimits(raw: string | null | undefined) {
+  return PLAN_LIMITS[normalizePlan(raw)];
+}
 
 // Gera um código de empresa curto e legível (ex.: "VTX-9F3A2C1D").
 export function generateCompanyCode(): string {
