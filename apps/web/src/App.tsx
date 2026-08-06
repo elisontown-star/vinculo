@@ -125,7 +125,6 @@ function GoogleCompleteForm({ pendingKey, onDone }: { pendingKey: string; onDone
   const { t } = useI18n();
   const [clinicName, setClinicName] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
-  const [plan, setPlan] = useState<'essencial' | 'pro'>('essencial');
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [error, setError] = useState('');
@@ -209,6 +208,7 @@ function Auth({ onDone }: { onDone: () => void }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
+  const [plan, setPlan] = useState<'essencial' | 'pro'>('essencial');
   const [error, setError] = useState('');
   const [blocked, setBlocked] = useState(false);
   const [busy, setBusy] = useState(false);
