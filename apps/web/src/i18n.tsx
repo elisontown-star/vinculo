@@ -4,9 +4,9 @@ import { S, O, type Lang } from './locales';
 const STORAGE = 'vinculo_lang';
 function initial(): Lang {
   const s = localStorage.getItem(STORAGE) as Lang | null;
-  if (s && ['pt', 'en', 'es', 'fr'].includes(s)) return s;
+  if (s && ['pt', 'en'].includes(s)) return s;
   const nav = navigator.language.slice(0, 2);
-  return (['pt', 'en', 'es', 'fr'].includes(nav) ? nav : 'pt') as Lang;
+  return (['pt', 'en'].includes(nav) ? nav : 'pt') as Lang;
 }
 
 type Ctx = {

@@ -90,10 +90,14 @@ const whatsappField = z
   .transform((v) => v.replace(/\D/g, ''))
   .refine((v) => v.length === 10 || v.length === 11, 'invalid_whatsapp');
 
+// Campo de texto obrigatório: remove espaços das pontas e exige conteúdo real.
+const requiredText = (min = 2) =>
+  z.string().transform((v) => v.trim()).refine((v) => v.length >= min, 'required_field');
+
 const registerSchema = z.object({
-  clinicName: z.string().min(2),
-  name: z.string().min(2),
-  email: z.string().email(),
+  clinicName: requiredText(2),
+  name: requiredText(2),
+  email: z.string().trim().email(),
   password: strongPassword,
   whatsapp: whatsappField,
 });
@@ -570,7 +574,7 @@ authRoutes.post('/google/exchange', async (c) => {
 // Passo 3 (somente novos usuários): finaliza criação da clínica após Google OAuth.
 const googleCompleteSchema = z.object({
   pendingKey: z.string().min(10),
-  clinicName: z.string().min(2),
+  clinicName: requiredText(2),
   whatsapp: whatsappField,
 });
 

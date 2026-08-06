@@ -134,11 +134,13 @@ function GoogleCompleteForm({ pendingKey, onDone }: { pendingKey: string; onDone
     e.preventDefault();
     setError('');
     if (!termsAccepted) { setError('Você precisa aceitar os Termos de Uso para continuar.'); return; }
+    if (!clinicName.trim() || !whatsapp.trim()) { setError(t('err.required_fields')); return; }
+    if (clinicName.trim().length < 2) { setError(t('err.name_too_short')); return; }
     const zap = whatsapp.replace(/\D/g, '');
     if (zap.length !== 10 && zap.length !== 11) { setError(t('err.invalid_whatsapp')); return; }
     setBusy(true);
     try {
-      const res = await api.googleComplete({ pendingKey, clinicName, whatsapp: zap });
+      const res = await api.googleComplete({ pendingKey, clinicName: clinicName.trim(), whatsapp: zap });
       setToken((res as any).token);
       setUser((res as any).user);
       window.history.replaceState({}, '', '/');
@@ -260,6 +262,16 @@ function Auth({ onDone }: { onDone: () => void }) {
       return;
     }
     if (mode === 'register') {
+      // Todo campo do cadastro é obrigatório. `required` do HTML não basta:
+      // ele aceita só espaços em branco.
+      if (!clinicName.trim() || !name.trim() || !email.trim() || !whatsapp.trim() || !password) {
+        setError(t('err.required_fields'));
+        return;
+      }
+      if (clinicName.trim().length < 2 || name.trim().length < 2) {
+        setError(t('err.name_too_short'));
+        return;
+      }
       const strong =
         password.length >= 8 &&
         /[a-z]/.test(password) &&
@@ -280,7 +292,7 @@ function Auth({ onDone }: { onDone: () => void }) {
     try {
       const res: any =
         mode === 'register'
-          ? await api.register({ clinicName, name, email, password, whatsapp: whatsapp.replace(/\D/g, '') })
+          ? await api.register({ clinicName: clinicName.trim(), name: name.trim(), email: email.trim(), password, whatsapp: whatsapp.replace(/\D/g, '') })
           : await api.login({ email, password });
 
       if (res.mfaSetupRequired) {
