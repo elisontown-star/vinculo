@@ -1,10 +1,8 @@
-// Planos comerciais e limites de vagas por clínica.
-// O plano é escolhido na criação (pelo "tamanho da empresa") e define quantos
-// psicólogos e secretárias a clínica pode ter.
+// Plano comercial e limites de vagas por clínica.
+// Hoje existe um plano único; a estrutura de mapa fica para facilitar a volta
+// de outros planos no futuro sem mexer em quem consome PLAN_LIMITS.
 export const PLAN_LIMITS = {
-  essencial: { psychologist: 1, secretary: 1 },
-  pro: { psychologist: 4, secretary: 4 },
-  plus: { psychologist: 8, secretary: 8 },
+  essencial: { psychologist: 3, secretary: 3 },
 } as const;
 
 export type PlanKey = keyof typeof PLAN_LIMITS;

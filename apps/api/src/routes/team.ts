@@ -200,7 +200,7 @@ teamRoutes.post('/invite/accept', zValidator('json', acceptSchema), async (c) =>
 // O owner não muda o plano sozinho: ele solicita, e a mudança é aplicada pelo
 // super admin no portal. Aqui apenas enviamos um e-mail para os administradores.
 const planRequestSchema = z.object({
-  plan: z.enum(['essencial', 'pro', 'plus']),
+  plan: z.enum(['essencial']),
   message: z.string().max(500).optional(),
 });
 teamRoutes.post('/plan-request', requireAuth, requireRole('owner'), zValidator('json', planRequestSchema), async (c) => {

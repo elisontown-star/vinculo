@@ -31,21 +31,13 @@ export function Brand({ hideLogo = false }: { hideLogo?: boolean }) {
   );
 }
 
-function maskTaxId(type: 'cnpj' | 'cpf', v: string): string {
-  const d = v.replace(/\D/g, '');
-  if (type === 'cpf') {
-    const s = d.slice(0, 11);
-    if (s.length > 9) return `${s.slice(0, 3)}.${s.slice(3, 6)}.${s.slice(6, 9)}-${s.slice(9)}`;
-    if (s.length > 6) return `${s.slice(0, 3)}.${s.slice(3, 6)}.${s.slice(6)}`;
-    if (s.length > 3) return `${s.slice(0, 3)}.${s.slice(3)}`;
-    return s;
-  }
-  const s = d.slice(0, 14);
-  if (s.length > 12) return `${s.slice(0, 2)}.${s.slice(2, 5)}.${s.slice(5, 8)}/${s.slice(8, 12)}-${s.slice(12)}`;
-  if (s.length > 8) return `${s.slice(0, 2)}.${s.slice(2, 5)}.${s.slice(5, 8)}/${s.slice(8)}`;
-  if (s.length > 5) return `${s.slice(0, 2)}.${s.slice(2, 5)}.${s.slice(5)}`;
-  if (s.length > 2) return `${s.slice(0, 2)}.${s.slice(2)}`;
-  return s;
+// (11) 91234-5678 — formata enquanto digita.
+function maskWhatsapp(v: string): string {
+  const d = v.replace(/\D/g, '').slice(0, 11);
+  if (d.length <= 2) return d;
+  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
 }
 
 
@@ -87,7 +79,7 @@ function TermsModal({ onClose }: { onClose: () => void }) {
           <p>Para utilizar o serviço, o usuário deverá criar uma conta com informações verdadeiras e atualizadas. É vedado compartilhar credenciais, criar contas com dados de terceiros ou criar múltiplas contas para evasão de limites. O usuário é responsável por todas as atividades realizadas em sua conta.</p>
 
           <h2>4. Planos, Pagamento e Cancelamento</h2>
-          <p><strong>Período de teste:</strong> 7 dias gratuitos, sem cartão de crédito. Após esse período, a continuidade está condicionada à contratação de um plano pago.</p>
+          <p><strong>Período de teste:</strong> 30 dias gratuitos, sem cartão de crédito. Após esse período, a continuidade está condicionada à contratação de um plano pago.</p>
           <p><strong>Cancelamento:</strong> pode ser feito a qualquer momento pelo painel da conta, com efeito ao final do período já pago.</p>
           <p><strong>Direito de arrependimento:</strong> nos termos do Art. 49 do CDC, o usuário pessoa física pode solicitar cancelamento e reembolso integral em até 7 dias corridos da contratação.</p>
 
@@ -132,9 +124,7 @@ const GOOGLE_ERROR_MAP: Record<string, string> = {
 function GoogleCompleteForm({ pendingKey, onDone }: { pendingKey: string; onDone: () => void }) {
   const { t } = useI18n();
   const [clinicName, setClinicName] = useState('');
-  const [taxIdType, setTaxIdType] = useState<'cnpj' | 'cpf'>('cnpj');
-  const [taxId, setTaxId] = useState('');
-  const [plan, setPlan] = useState<'essencial' | 'pro' | 'plus'>('essencial');
+  const [whatsapp, setWhatsapp] = useState('');
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [error, setError] = useState('');
@@ -144,18 +134,18 @@ function GoogleCompleteForm({ pendingKey, onDone }: { pendingKey: string; onDone
     e.preventDefault();
     setError('');
     if (!termsAccepted) { setError('Você precisa aceitar os Termos de Uso para continuar.'); return; }
-    const taxDigits = taxId.replace(/\D/g, '');
-    if (taxDigits.length !== (taxIdType === 'cpf' ? 11 : 14)) { setError(t('err.invalid_tax_id')); return; }
+    const zap = whatsapp.replace(/\D/g, '');
+    if (zap.length !== 10 && zap.length !== 11) { setError(t('err.invalid_whatsapp')); return; }
     setBusy(true);
     try {
-      const res = await api.googleComplete({ pendingKey, clinicName, taxIdType, taxId: taxDigits, plan });
+      const res = await api.googleComplete({ pendingKey, clinicName, whatsapp: zap });
       setToken((res as any).token);
       setUser((res as any).user);
       window.history.replaceState({}, '', '/');
       onDone();
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'generic';
-      setError(msg === 'pending_expired' ? 'Sessão expirada. Faça login com Google novamente.' : msg === 'invalid_tax_id' ? t('err.invalid_tax_id') : 'Erro ao criar conta. Tente novamente.');
+      setError(msg === 'pending_expired' ? 'Sessão expirada. Faça login com Google novamente.' : msg === 'invalid_whatsapp' ? t('err.invalid_whatsapp') : 'Erro ao criar conta. Tente novamente.');
     } finally {
       setBusy(false);
     }
@@ -176,32 +166,18 @@ function GoogleCompleteForm({ pendingKey, onDone }: { pendingKey: string; onDone
                 <input id="gc-clinic" value={clinicName} onChange={(e) => setClinicName(e.target.value)} required />
               </div>
               <div className="field">
-                <label htmlFor="gc-taxid">{t('lbl.taxId')}</label>
-                <div className="seg">
-                  <button type="button" className={taxIdType === 'cnpj' ? 'on' : ''} onClick={() => { setTaxIdType('cnpj'); setTaxId(''); }}>{t('taxId.cnpj')}</button>
-                  <button type="button" className={taxIdType === 'cpf' ? 'on' : ''} onClick={() => { setTaxIdType('cpf'); setTaxId(''); }}>{t('taxId.cpf')}</button>
-                </div>
+                <label htmlFor="gc-whatsapp">{t('lbl.whatsapp')}</label>
                 <input
-                  id="gc-taxid"
+                  id="gc-whatsapp"
+                  type="tel"
                   inputMode="numeric"
-                  value={taxId}
-                  onChange={(e) => setTaxId(maskTaxId(taxIdType, e.target.value))}
-                  placeholder={taxIdType === 'cnpj' ? '00.000.000/0000-00' : '000.000.000-00'}
+                  value={whatsapp}
+                  onChange={(e) => setWhatsapp(maskWhatsapp(e.target.value))}
+                  placeholder="(11) 91234-5678"
                   required
                 />
               </div>
-              <div className="field">
-                <label>{t('lbl.plan')}</label>
-                <div className="plan-picker">
-                  {(['essencial', 'pro', 'plus'] as const).map((p) => (
-                    <button type="button" key={p} className={`plan-card ${plan === p ? 'on' : ''}`} onClick={() => setPlan(p)}>
-                      <span className="plan-name">{t('plan.' + p)}</span>
-                      <span className="plan-seats">{t('plan.' + p + '.seats')}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="trial-notice">🎁 {t('auth.trialNotice')}</div>
+              <div className="trial-notice">{t('auth.trialNotice')}</div>
               <label className="terms-check-label">
                 <input type="checkbox" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} className="terms-check-input" />
                 <span>Li e aceito os{' '}
@@ -229,9 +205,7 @@ function Auth({ onDone }: { onDone: () => void }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [plan, setPlan] = useState<'essencial' | 'pro' | 'plus'>('essencial');
-  const [taxIdType, setTaxIdType] = useState<'cnpj' | 'cpf'>('cnpj');
-  const [taxId, setTaxId] = useState('');
+  const [whatsapp, setWhatsapp] = useState('');
   const [error, setError] = useState('');
   const [blocked, setBlocked] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -296,9 +270,9 @@ function Auth({ onDone }: { onDone: () => void }) {
         setError(t('pw.tooWeak'));
         return;
       }
-      const taxDigits = taxId.replace(/\D/g, '');
-      if (taxDigits.length !== (taxIdType === 'cpf' ? 11 : 14)) {
-        setError(t('err.invalid_tax_id'));
+      const zap = whatsapp.replace(/\D/g, '');
+      if (zap.length !== 10 && zap.length !== 11) {
+        setError(t('err.invalid_whatsapp'));
         return;
       }
     }
@@ -306,7 +280,7 @@ function Auth({ onDone }: { onDone: () => void }) {
     try {
       const res: any =
         mode === 'register'
-          ? await api.register({ clinicName, name, email, password, plan, taxIdType, taxId: taxId.replace(/\D/g, '') })
+          ? await api.register({ clinicName, name, email, password, whatsapp: whatsapp.replace(/\D/g, '') })
           : await api.login({ email, password });
 
       if (res.mfaSetupRequired) {
@@ -474,30 +448,16 @@ function Auth({ onDone }: { onDone: () => void }) {
                   <input id="clinic" value={clinicName} onChange={(e) => setClinicName(e.target.value)} required />
                 </div>
                 <div className="field">
-                  <label htmlFor="taxid">{t('lbl.taxId')}</label>
-                  <div className="seg">
-                    <button type="button" className={taxIdType === 'cnpj' ? 'on' : ''} onClick={() => { setTaxIdType('cnpj'); setTaxId(''); }}>{t('taxId.cnpj')}</button>
-                    <button type="button" className={taxIdType === 'cpf' ? 'on' : ''} onClick={() => { setTaxIdType('cpf'); setTaxId(''); }}>{t('taxId.cpf')}</button>
-                  </div>
+                  <label htmlFor="whatsapp">{t('lbl.whatsapp')}</label>
                   <input
-                    id="taxid"
+                    id="whatsapp"
+                    type="tel"
                     inputMode="numeric"
-                    value={taxId}
-                    onChange={(e) => setTaxId(maskTaxId(taxIdType, e.target.value))}
-                    placeholder={taxIdType === 'cnpj' ? '00.000.000/0000-00' : '000.000.000-00'}
+                    value={whatsapp}
+                    onChange={(e) => setWhatsapp(maskWhatsapp(e.target.value))}
+                    placeholder="(11) 91234-5678"
                     required
                   />
-                </div>
-                <div className="field">
-                  <label>{t('lbl.plan')}</label>
-                  <div className="plan-picker">
-                    {(['essencial', 'pro', 'plus'] as const).map((p) => (
-                      <button type="button" key={p} className={`plan-card ${plan === p ? 'on' : ''}`} onClick={() => setPlan(p)}>
-                        <span className="plan-name">{t('plan.' + p)}</span>
-                        <span className="plan-seats">{t('plan.' + p + '.seats')}</span>
-                      </button>
-                    ))}
-                  </div>
                 </div>
                 <div className="field">
                   <label htmlFor="name">{t('lbl.yourName')}</label>
@@ -523,7 +483,7 @@ function Auth({ onDone }: { onDone: () => void }) {
               </ul>
             )}
             {mode === 'register' && (
-              <div className="trial-notice">🎁 {t('auth.trialNotice')}</div>
+              <div className="trial-notice">{t('auth.trialNotice')}</div>
             )}
             {mode === 'register' && (
               <label className="terms-check-label">

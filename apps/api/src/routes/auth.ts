@@ -9,7 +9,7 @@ import { hashPassword, verifyPassword } from '../lib/password';
 import { sendPasswordResetEmail } from '../lib/email';
 import { audit } from '../lib/audit';
 import { requireAuth } from '../middleware/auth';
-import { generateCompanyCode, isValidTaxId } from '../lib/plans';
+import { generateCompanyCode } from '../lib/plans';
 import { rateLimit, clientIp } from '../lib/ratelimit';
 import {
   newSecret,
@@ -84,14 +84,18 @@ const strongPassword = z
   .refine((v) => /[0-9]/.test(v), 'weak_number')
   .refine((v) => /[^A-Za-z0-9]/.test(v), 'weak_special');
 
+// WhatsApp com DDD: 10 ou 11 dígitos após limpar a máscara.
+const whatsappField = z
+  .string()
+  .transform((v) => v.replace(/\D/g, ''))
+  .refine((v) => v.length === 10 || v.length === 11, 'invalid_whatsapp');
+
 const registerSchema = z.object({
   clinicName: z.string().min(2),
   name: z.string().min(2),
   email: z.string().email(),
   password: strongPassword,
-  plan: z.enum(['essencial', 'pro', 'plus']).default('essencial'),
-  taxIdType: z.enum(['cnpj', 'cpf']),
-  taxId: z.string().min(11).max(20),
+  whatsapp: whatsappField,
 });
 
 // Cria a clínica (tenant) + o usuário dono. Ponto de entrada de uma nova clínica.
@@ -100,17 +104,11 @@ authRoutes.post('/register', zValidator('json', registerSchema), async (c) => {
   if (!(await rateLimit(c.env, `register:${ip}`, 5, 300))) {
     return c.json({ error: 'rate_limited' }, 429);
   }
-  const { clinicName, name, email, password, plan, taxIdType, taxId } = c.req.valid('json');
+  const { clinicName, name, email, password, whatsapp } = c.req.valid('json');
   const db = getDb(c.env);
 
   const existing = await db.select().from(users).where(eq(users.email, email)).get();
   if (existing) return c.json({ error: 'email_in_use' }, 409);
-
-  // Valida o documento fiscal (CPF ou CNPJ) pelos dígitos verificadores.
-  const taxDigits = taxId.replace(/\D/g, '');
-  if (!isValidTaxId(taxIdType, taxDigits)) {
-    return c.json({ error: 'invalid_tax_id' }, 400);
-  }
 
   // Gera um código de empresa único (com algumas tentativas para evitar colisão).
   let companyCode = generateCompanyCode();
@@ -120,11 +118,11 @@ authRoutes.post('/register', zValidator('json', registerSchema), async (c) => {
     companyCode = generateCompanyCode();
   }
 
-  const TRIAL_DAYS = 7;
+  const TRIAL_DAYS = 30;
   const trialEndsAt = Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000;
   const clinic = await db
     .insert(clinics)
-    .values({ name: clinicName, status: 'trial', trialEndsAt, plan, taxIdType, taxId: taxDigits, companyCode })
+    .values({ name: clinicName, status: 'trial', trialEndsAt, plan: 'essencial', whatsapp, companyCode })
     .returning()
     .get();
   const passwordHash = await hashPassword(password);
@@ -573,13 +571,11 @@ authRoutes.post('/google/exchange', async (c) => {
 const googleCompleteSchema = z.object({
   pendingKey: z.string().min(10),
   clinicName: z.string().min(2),
-  taxIdType: z.enum(['cnpj', 'cpf']),
-  taxId: z.string().min(11).max(20),
-  plan: z.enum(['essencial', 'pro', 'plus']).default('essencial'),
+  whatsapp: whatsappField,
 });
 
 authRoutes.post('/google/complete', zValidator('json', googleCompleteSchema), async (c) => {
-  const { pendingKey, clinicName, taxIdType, taxId, plan } = c.req.valid('json');
+  const { pendingKey, clinicName, whatsapp } = c.req.valid('json');
 
   const raw = await c.env.CACHE.get(`gpending:${pendingKey}`);
   if (!raw) return c.json({ error: 'pending_expired' }, 400);
@@ -602,11 +598,6 @@ authRoutes.post('/google/complete', zValidator('json', googleCompleteSchema), as
   }
 
 
-  const taxDigits = taxId.replace(/\D/g, '');
-  if (!isValidTaxId(taxIdType, taxDigits)) {
-    return c.json({ error: 'invalid_tax_id' }, 400);
-  }
-
   let companyCode = generateCompanyCode();
   for (let i = 0; i < 5; i++) {
     const clash = await db.select({ id: clinics.id }).from(clinics).where(eq(clinics.companyCode, companyCode)).get();
@@ -614,11 +605,11 @@ authRoutes.post('/google/complete', zValidator('json', googleCompleteSchema), as
     companyCode = generateCompanyCode();
   }
 
-  const TRIAL_DAYS = 7;
+  const TRIAL_DAYS = 30;
   const trialEndsAt = Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000;
   const clinic = await db
     .insert(clinics)
-    .values({ name: clinicName, status: 'trial', trialEndsAt, plan, taxIdType, taxId: taxDigits, companyCode })
+    .values({ name: clinicName, status: 'trial', trialEndsAt, plan: 'essencial', whatsapp, companyCode })
     .returning()
     .get();
 

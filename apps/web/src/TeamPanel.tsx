@@ -11,14 +11,14 @@ export default function TeamPanel({ onClose }: { onClose: () => void }) {
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [info, setInfo] = useState<{
     companyCode: string | null;
-    plan: 'essencial' | 'pro' | 'plus';
+    plan: 'essencial';
     limits: { psychologist: number; secretary: number };
     usage: { psychologist: number; secretary: number };
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [showInvite, setShowInvite] = useState(false);
   const [showPlanReq, setShowPlanReq] = useState(false);
-  const [reqPlan, setReqPlan] = useState<'essencial' | 'pro' | 'plus'>('pro');
+  const [reqPlan, setReqPlan] = useState<'essencial'>('essencial');
   const [reqMsg, setReqMsg] = useState('');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -158,10 +158,8 @@ export default function TeamPanel({ onClose }: { onClose: () => void }) {
                 ) : (
                   <form onSubmit={requestPlan} className="team-plan-req-form">
                     <label>{t('team.requestPlanTo')}</label>
-                    <select value={reqPlan} onChange={(e) => setReqPlan(e.target.value as 'essencial' | 'pro' | 'plus')}>
+                    <select value={reqPlan} onChange={(e) => setReqPlan(e.target.value as 'essencial')}>
                       <option value="essencial">{t('plan.essencial')}</option>
-                      <option value="pro">{t('plan.pro')}</option>
-                      <option value="plus">{t('plan.plus')}</option>
                     </select>
                     <textarea value={reqMsg} onChange={(e) => setReqMsg(e.target.value)} placeholder={t('team.requestPlanMsg')} rows={2} />
                     <div className="team-invite-actions">

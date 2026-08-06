@@ -75,7 +75,7 @@ export type AdminClinic = {
   isActive: boolean;
   status?: 'trial' | 'active' | 'blocked';
   trialEndsAt?: number | null;
-  plan?: 'essencial' | 'pro' | 'plus';
+  plan?: 'essencial';
   companyCode?: string | null;
   users: number;
   patients: number;
@@ -208,7 +208,7 @@ export const api = {
   googleAuthUrl: () => `${BASE}/auth/google`,
   googleExchange: (code: string): Promise<{ token: string; user: unknown }> =>
     req('/auth/google/exchange', { method: 'POST', body: JSON.stringify({ code }) }),
-  googleComplete: (b: { pendingKey: string; clinicName: string; taxIdType: 'cnpj' | 'cpf'; taxId: string; plan: 'essencial' | 'pro' | 'plus' }): Promise<{ token: string; user: unknown }> =>
+  googleComplete: (b: { pendingKey: string; clinicName: string; whatsapp: string }): Promise<{ token: string; user: unknown }> =>
     req('/auth/google/complete', { method: 'POST', body: JSON.stringify(b) }),
 
   forgotPassword: (email: string): Promise<{ ok: boolean }> =>
@@ -236,7 +236,7 @@ export const api = {
     req(`/admin/clinics/${clinicId}/extend-trial`, { method: 'POST', body: JSON.stringify({ days }) }),
   adminDeleteClinic: (clinicId: string, confirmName: string, mfaCode: string): Promise<{ ok: boolean }> =>
     req(`/admin/clinics/${clinicId}/delete`, { method: 'POST', body: JSON.stringify({ confirmName, mfaCode }) }),
-  adminSetPlan: (clinicId: string, plan: 'essencial' | 'pro' | 'plus'): Promise<{ ok: boolean }> =>
+  adminSetPlan: (clinicId: string, plan: 'essencial'): Promise<{ ok: boolean }> =>
     req(`/admin/clinics/${clinicId}/plan`, { method: 'POST', body: JSON.stringify({ plan }) }),
   adminSearch: (q: string): Promise<{ users: (AdminUser & { clinicId: string; clinicName: string })[]; clinics: { id: string; name: string; isActive: boolean; createdAt: number }[] }> =>
     req(`/admin/search?q=${encodeURIComponent(q)}`),
@@ -244,13 +244,13 @@ export const api = {
   // --- Equipe da clínica (owner) ---
   teamList: (): Promise<{
     members: TeamMember[];
-    clinic: { companyCode: string | null; plan: 'essencial' | 'pro' | 'plus' } | null;
+    clinic: { companyCode: string | null; plan: 'essencial' } | null;
     limits: { psychologist: number; secretary: number };
     usage: { psychologist: number; secretary: number };
   }> => req('/team'),
   teamInvite: (b: { name: string; email: string; role?: string }): Promise<{ ok: boolean; emailSent: boolean }> =>
     req('/team/invite', { method: 'POST', body: JSON.stringify(b) }),
-  teamRequestPlan: (plan: 'essencial' | 'pro' | 'plus', message?: string): Promise<{ ok: boolean }> =>
+  teamRequestPlan: (plan: 'essencial', message?: string): Promise<{ ok: boolean }> =>
     req('/team/plan-request', { method: 'POST', body: JSON.stringify({ plan, message }) }),
   teamResend: (id: string): Promise<{ ok: boolean }> =>
     req(`/team/${id}/resend`, { method: 'POST' }),

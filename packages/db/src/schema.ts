@@ -13,9 +13,12 @@ export const clinics = sqliteTable('clinics', {
   companyCode: text('company_code'),
   // Plano contratado, definido pelo tamanho da empresa na criação.
   plan: text('plan', { enum: ['essencial', 'pro', 'plus'] }).notNull().default('essencial'),
-  // Documento fiscal da empresa/profissional.
+  // Documento fiscal — mantido para as clínicas cadastradas antes da mudança;
+  // o cadastro atual não pede mais CPF/CNPJ.
   taxIdType: text('tax_id_type', { enum: ['cnpj', 'cpf'] }),
   taxId: text('tax_id'),
+  // WhatsApp de contato da clínica/psicólogo, coletado no cadastro.
+  whatsapp: text('whatsapp'),
   isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
   // Ciclo de vida comercial: 'trial' (testando), 'active' (plano pago), 'blocked' (expirado).
   status: text('status', { enum: ['trial', 'active', 'blocked'] }).notNull().default('trial'),

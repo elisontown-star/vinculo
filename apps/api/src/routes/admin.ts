@@ -387,7 +387,7 @@ adminRoutes.post('/clinics/:id/extend-trial', zValidator('json', extendSchema), 
 // --- Mudar o plano da clínica (upgrade/downgrade) ----------------------------
 // Ação do super admin (o owner apenas solicita por e-mail). No downgrade,
 // bloqueia se a clínica já tiver mais usuários do que o novo plano comporta.
-const planSchema = z.object({ plan: z.enum(['essencial', 'pro', 'plus']) });
+const planSchema = z.object({ plan: z.enum(['essencial']) });
 adminRoutes.post('/clinics/:id/plan', zValidator('json', planSchema), async (c) => {
   const clinicId = c.req.param('id');
   const { plan } = c.req.valid('json');
