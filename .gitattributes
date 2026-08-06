@@ -1,0 +1,16 @@
+# Normaliza as quebras de linha: no repositório tudo fica em LF, independente
+# do sistema de quem edita. Sem isso, o Windows reescreve os arquivos em CRLF
+# e o git marca centenas de linhas como alteradas sem nenhuma mudança real.
+* text=auto eol=lf
+
+# Binários: nunca converter.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.zip binary
