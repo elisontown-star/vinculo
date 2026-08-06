@@ -45,7 +45,8 @@ app.get('/health', async (c) => {
   }
   try {
     const probe = `health:probe:${Date.now()}`;
-    await c.env.CACHE.put(probe, '1', { expirationTtl: 10 });
+    // 60s é o mínimo aceito pelo KV; abaixo disso a escrita falha.
+    await c.env.CACHE.put(probe, '1', { expirationTtl: 60 });
     await c.env.CACHE.delete(probe);
     checks.kv = 'ok';
   } catch {

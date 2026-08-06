@@ -251,7 +251,10 @@ function Auth({ onDone }: { onDone: () => void }) {
     }
     if (gerror) {
       window.history.replaceState({}, '', '/');
-      setError(GOOGLE_ERROR_MAP[gerror] ?? 'Erro ao autenticar com Google.');
+      // Códigos fora do mapa aparecem crus: sem isso o motivo real some junto
+      // com a URL e o diagnóstico vira adivinhação.
+      console.error('[google] gerror:', gerror);
+      setError(GOOGLE_ERROR_MAP[gerror] ?? `Erro ao autenticar com Google (${gerror}).`);
     }
   }, []);
 

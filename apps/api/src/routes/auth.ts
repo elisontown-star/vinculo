@@ -434,6 +434,8 @@ authRoutes.post('/reset-password', zValidator('json', resetSchema), async (c) =>
 // ---- Google OAuth -----------------------------------------------------------
 
 const GOOGLE_STATE_TTL = 300; // 5 min
+// TTL mínimo aceito pelo Workers KV.
+const KV_MIN_TTL = 60;
 
 // Passo 1: redireciona para a tela de consentimento do Google.
 authRoutes.get('/google', async (c) => {
@@ -541,7 +543,8 @@ authRoutes.get('/google/callback', async (c) => {
       await c.env.CACHE.put(
         `goauth_code:${oauthCode}`,
         JSON.stringify({ token: jwtToken, user: { id: user.id, name: user.name, email: user.email, role: user.role, mfaEnabled: !!user.mfaEnabled } }),
-        { expirationTtl: 30 },
+        // Mínimo aceito pelo KV é 60s — valores menores voltam 400 Invalid expiration.
+        { expirationTtl: KV_MIN_TTL },
       );
       return c.redirect(`${frontendOrigin}?gcode=${oauthCode}`);
     }
